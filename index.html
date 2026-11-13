@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cut">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0b0f17">
 <title>Speed Clock</title>
 <style>
@@ -12,7 +12,7 @@
   }
   @media (prefers-color-scheme: light) {
     :root { --bg: #f4f6fa; --panel: #fff; --panel2: #eef1f7; --text: #121826; --muted: #5b667d;
-      --accent: #12a66a; --accent2: #1f6fd1; --danger: #d92d3e; --warn: #c27a00; --border: #d8deea; }
+      --accent: #12a66a; --accent2: #1f6fd1; --danger: #d92d3e; --warn: #e89400; --border: #d8deea; }
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; background: var(--bg); color: var(--text);
@@ -20,91 +20,97 @@
   body { min-height: 100dvh; display: flex; flex-direction: column; align-items: center;
     padding: max(16px, env(safe-area-inset-top)) 16px 24px; -webkit-tap-highlight-color: transparent; }
   main { width: 100%; max-width: 720px; display: flex; flex-direction: column; gap: 14px; }
-  header { display: flex; justify-content: space-between; align-items: center; }
   h1 { font-size: 1.1rem; margin: 0; letter-spacing: .04em; }
-  .tabs { display: flex; background: var(--panel); border: 1px solid var(--border); border-radius: 999px; padding: 3px; }
-  .tabs button { border: 0; background: none; color: var(--muted); padding: 6px 14px; border-radius: 999px;
-    font: inherit; font-size: .9rem; cursor: pointer; }
-  .tabs button.on { background: var(--panel2); color: var(--text); font-weight: 600; }
 
   .display { background: var(--panel); border: 1px solid var(--border); border-radius: 20px;
-    padding: 20px 16px; text-align: center; user-select: none; cursor: pointer; position: relative; }
-  .time { font-variant-numeric: tabular-nums; font-weight: 700; font-size: clamp(3rem, 15vw, 6.5rem);
+    padding: 20px 16px; text-align: center; user-select: none; cursor: pointer; touch-action: manipulation; }
+  .time { font-variant-numeric: tabular-nums; font-weight: 700; font-size: clamp(2.6rem, 13vw, 6rem);
     line-height: 1; letter-spacing: -.02em; }
   .time small { font-size: .45em; color: var(--muted); font-weight: 600; }
-  .sub { margin-top: 10px; color: var(--muted); font-variant-numeric: tabular-nums; display: flex;
-    justify-content: center; gap: 18px; flex-wrap: wrap; font-size: .95rem; }
+  .laps-big { margin-top: 12px; font-variant-numeric: tabular-nums; font-size: clamp(1.2rem, 5vw, 1.8rem); font-weight: 700; }
+  .laps-big span { color: var(--muted); font-weight: 500; font-size: .7em; }
+  .sub { margin-top: 8px; color: var(--muted); font-variant-numeric: tabular-nums; display: flex;
+    justify-content: center; gap: 16px; flex-wrap: wrap; font-size: .9rem; }
   .sub b { color: var(--text); }
   .progress { height: 6px; background: var(--panel2); border-radius: 3px; margin-top: 14px; overflow: hidden; }
   .progress > i { display: block; height: 100%; width: 0; background: var(--accent2); }
-  .display.done .time { color: var(--danger); animation: blink .5s steps(2) infinite; }
-  @keyframes blink { 50% { opacity: .3; } }
+  .display.done .time { color: var(--danger); }
   .flash { animation: flash .25s ease-out; }
   @keyframes flash { from { box-shadow: 0 0 0 4px var(--accent); } to { box-shadow: 0 0 0 0 transparent; } }
 
   .controls { display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 10px; }
-  .controls button { border: 0; border-radius: 16px; font: inherit; font-weight: 700; font-size: 1.1rem;
-    padding: 18px 8px; cursor: pointer; color: #fff; touch-action: manipulation; }
+  button { font: inherit; touch-action: manipulation; cursor: pointer; }
+  .controls button { border: 0; border-radius: 16px; font-weight: 700; font-size: 1.1rem; padding: 18px 8px; color: #fff; }
   .controls button:active { transform: scale(.97); }
   .controls button:disabled { opacity: .35; cursor: default; transform: none; }
   #btnStart { background: var(--accent); color: #062b1b; }
   #btnStart.running { background: var(--danger); color: #fff; }
   #btnLap { background: var(--accent2); font-size: 1.5rem; }
   #btnReset { background: var(--panel2); color: var(--text); border: 1px solid var(--border); }
+
+  .auto { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: stretch;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 12px; }
+  #btnAuto { border: 2px solid var(--border); background: var(--panel2); color: var(--text); border-radius: 12px;
+    padding: 10px 16px; font-weight: 800; min-width: 130px; }
+  #btnAuto.on { background: var(--warn); border-color: var(--warn); color: #241500; }
+  .auto .cfg { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .row { display: flex; gap: 6px; align-items: center; }
+  .lbl { color: var(--muted); font-size: .85rem; }
+  input[type=text], input[type=number] { width: 100%; min-width: 0; background: var(--panel2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 10px; padding: 9px 10px; font: inherit; font-variant-numeric: tabular-nums; }
+  input.bad { border-color: var(--danger); }
+  .presets { display: flex; gap: 6px; flex-wrap: wrap; }
+  .presets button, .tbtn { background: var(--panel2); border: 1px solid var(--border); color: var(--text); border-radius: 8px;
+    padding: 5px 10px; font-size: .82rem; }
   .hint { text-align: center; color: var(--muted); font-size: .8rem; }
   kbd { background: var(--panel2); border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; font-size: .75rem; }
 
   details { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 4px 16px; }
   summary { cursor: pointer; padding: 10px 0; font-weight: 600; }
-  .settings { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; padding: 6px 0 14px; }
-  .field { display: flex; flex-direction: column; gap: 6px; font-size: .88rem; color: var(--muted); }
-  .field .row { display: flex; gap: 6px; align-items: center; color: var(--text); }
-  input[type=number] { width: 100%; min-width: 0; background: var(--panel2); color: var(--text); border: 1px solid var(--border);
-    border-radius: 10px; padding: 9px 10px; font: inherit; font-variant-numeric: tabular-nums; }
-  .check { flex-direction: row; align-items: center; gap: 8px; color: var(--text); }
+  .settings { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; padding: 6px 0 14px; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .check { display: flex; align-items: center; gap: 8px; }
   .check input { width: 20px; height: 20px; accent-color: var(--accent); }
-  .presets { display: flex; gap: 6px; flex-wrap: wrap; }
-  .presets button { background: var(--panel2); border: 1px solid var(--border); color: var(--text); border-radius: 8px;
-    padding: 5px 10px; font: inherit; font-size: .82rem; cursor: pointer; }
 
   .laps { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
-  .laps-head { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+  .laps-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;
+    padding: 12px 16px; border-bottom: 1px solid var(--border); }
   .laps-head h2 { margin: 0; font-size: 1rem; }
-  .laps-head .act { display: flex; gap: 6px; }
-  .laps-head button { background: var(--panel2); border: 1px solid var(--border); color: var(--text); border-radius: 8px;
-    padding: 5px 10px; font: inherit; font-size: .82rem; cursor: pointer; }
+  .laps-head .act { display: flex; gap: 6px; flex-wrap: wrap; }
+  .nav { display: flex; gap: 6px; align-items: center; padding: 8px 16px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  .nav input { width: 150px; padding: 5px 8px; font-size: .85rem; }
+  .nav .pos { margin-left: auto; color: var(--muted); font-size: .8rem; font-variant-numeric: tabular-nums; }
+  .tbtn.live { background: var(--accent); color: #062b1b; border-color: var(--accent); }
+  .tablewrap { overscroll-behavior: contain; }
   table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
-  th, td { padding: 9px 16px; text-align: right; }
-  th { color: var(--muted); font-weight: 500; font-size: .8rem; text-align: right; position: sticky; top: 0; background: var(--panel); }
+  th, td { padding: 0 16px; height: 32px; text-align: right; white-space: nowrap; }
+  th { color: var(--muted); font-weight: 500; font-size: .8rem; }
   th:first-child, td:first-child { text-align: left; }
   tbody tr:nth-child(odd) { background: color-mix(in srgb, var(--panel2) 50%, transparent); }
   tr.best td:nth-child(2) { color: var(--accent); font-weight: 700; }
   tr.worst td:nth-child(2) { color: var(--danger); font-weight: 700; }
-  tr.auto td:first-child::after { content: " ⟳"; color: var(--muted); }
-  .scroll { max-height: 50vh; overflow-y: auto; }
+  tr.man td:first-child::after { content: " ●"; color: var(--accent2); font-size: .7em; }
   .empty { padding: 22px; text-align: center; color: var(--muted); }
   .stats { display: grid; grid-template-columns: repeat(3, 1fr); text-align: center; border-top: 1px solid var(--border); }
   .stats div { padding: 10px 4px; font-size: .78rem; color: var(--muted); }
-  .stats b { display: block; color: var(--text); font-size: 1rem; font-variant-numeric: tabular-nums; }
-  @media (max-width: 480px) { th, td { padding: 8px 10px; } .controls button { padding: 16px 4px; } }
+  .stats b { display: block; color: var(--text); font-size: .95rem; font-variant-numeric: tabular-nums; }
+  @media (max-width: 480px) {
+    th, td { padding: 0 8px; font-size: .85rem; } .controls button { padding: 16px 4px; }
+    .auto { grid-template-columns: 1fr; } #btnAuto { min-width: 0; }
+  }
 </style>
 </head>
 <body>
 <main>
-  <header>
-    <h1>⏱ SPEED CLOCK</h1>
-    <div class="tabs" role="tablist">
-      <button id="modeSw" class="on" role="tab">Stoppuhr</button>
-      <button id="modeCd" role="tab">Countdown</button>
-    </div>
-  </header>
+  <h1>⏱ SPEED CLOCK</h1>
 
   <section class="display" id="display" title="Tippen = Runde">
-    <div class="time" id="time">00:00<small>.00</small></div>
+    <div class="time" id="time">00:00<small>.000</small></div>
+    <div class="laps-big"><span>Runden</span> <b id="lapCountBig">0</b></div>
     <div class="sub">
-      <span>Runde <b id="lapNo">1</b></span>
-      <span>Rundenzeit <b id="lapTime">00:00.00</b></span>
-      <span id="autoInfo" hidden>Auto in <b id="autoLeft">–</b></span>
+      <span>Aktuelle Runde <b id="lapTime">00:00.000</b></span>
+      <span id="rateInfo" hidden><b id="rate">0</b> Runden/s</span>
+      <span id="remInfo" hidden>Rest <b id="remain">–</b></span>
     </div>
     <div class="progress" id="progressWrap" hidden><i id="progress"></i></div>
   </section>
@@ -114,56 +120,62 @@
     <button id="btnLap" disabled>Runde</button>
     <button id="btnStart">Start</button>
   </div>
-  <div class="hint"><kbd>Leertaste</kbd> Runde · <kbd>Enter</kbd> Start/Stopp · <kbd>R</kbd> Reset · Anzeige antippen = Runde</div>
 
-  <details id="settingsBox" open>
-    <summary>Einstellungen</summary>
+  <section class="auto">
+    <button id="btnAuto" aria-pressed="false">AUTO-RUNDEN<br>AUS</button>
+    <div class="cfg">
+      <label class="lbl" for="autoInt">Alle … Sekunden eine Runde (min. 0,000001 s)</label>
+      <div class="row"><input type="text" id="autoInt" inputmode="decimal" value="0,000001"> s</div>
+      <div class="presets" id="autoPresets">
+        <button data-s="0.000001">0,000001 s</button><button data-s="0.001">0,001 s</button>
+        <button data-s="0.1">0,1 s</button><button data-s="1">1 s</button><button data-s="10">10 s</button>
+      </div>
+    </div>
+  </section>
+
+  <div class="hint"><kbd>Leertaste</kbd> Runde · <kbd>Enter</kbd> Start/Stopp · <kbd>A</kbd> Auto an/aus · <kbd>R</kbd> Reset · Anzeige antippen = Runde</div>
+
+  <details open>
+    <summary>Dauer &amp; Optionen</summary>
     <div class="settings">
-      <div class="field" id="cdField" hidden>
-        Countdown-Zeit
-        <div class="row">
-          <input type="number" id="cdMin" min="0" max="999" value="5" aria-label="Minuten"> min
-          <input type="number" id="cdSec" min="0" max="59" value="0" aria-label="Sekunden"> s
-        </div>
-        <div class="presets" id="cdPresets">
-          <button data-s="30">30 s</button><button data-s="60">1 min</button><button data-s="180">3 min</button>
-          <button data-s="300">5 min</button><button data-s="600">10 min</button>
-        </div>
-      </div>
       <div class="field">
-        Auto-Runde alle … (0 = aus)
+        <span class="lbl">Dauer der Stoppuhr (0 = unbegrenzt) – stoppt automatisch</span>
         <div class="row">
-          <input type="number" id="autoMin" min="0" max="999" value="0" aria-label="Minuten"> min
-          <input type="number" id="autoSec" min="0" max="59" step="0.5" value="0" aria-label="Sekunden"> s
+          <input type="number" id="durH" min="0" max="999" value="0" aria-label="Stunden"> h
+          <input type="number" id="durM" min="0" max="59" value="0" aria-label="Minuten"> min
+          <input type="text" id="durS" inputmode="decimal" value="0" aria-label="Sekunden"> s
         </div>
-        <div class="presets" id="autoPresets">
-          <button data-s="0">Aus</button><button data-s="10">10 s</button><button data-s="30">30 s</button>
-          <button data-s="60">1 min</button><button data-s="120">2 min</button>
+        <div class="presets" id="durPresets">
+          <button data-s="0">∞</button><button data-s="10">10 s</button><button data-s="60">1 min</button>
+          <button data-s="300">5 min</button><button data-s="3600">1 h</button>
         </div>
-      </div>
-      <div class="field">
-        Automatisch stoppen nach … Runden (0 = nie)
-        <div class="row"><input type="number" id="maxLaps" min="0" max="9999" value="0"></div>
       </div>
       <div class="field" style="gap:10px">
-        <label class="field check"><input type="checkbox" id="optBeep" checked> Ton bei Runde / Ende</label>
-        <label class="field check"><input type="checkbox" id="optVibrate" checked> Vibration (Handy)</label>
-        <label class="field check"><input type="checkbox" id="optWake" checked> Bildschirm wach halten</label>
+        <label class="check"><input type="checkbox" id="optBeep" checked> Ton (nur bei Runden ≥ 0,25 s)</label>
+        <label class="check"><input type="checkbox" id="optVibrate" checked> Vibration (Handy)</label>
+        <label class="check"><input type="checkbox" id="optWake" checked> Bildschirm wach halten</label>
       </div>
     </div>
   </details>
 
   <section class="laps">
     <div class="laps-head">
-      <h2>Runden <span id="lapCount" style="color:var(--muted);font-weight:500"></span></h2>
-      <div class="act"><button id="btnCopy">Kopieren</button><button id="btnCsv">CSV</button></div>
+      <h2>Runden</h2>
+      <div class="act"><button class="tbtn" id="btnCopy">Kopieren</button><button class="tbtn" id="btnCsv">CSV</button></div>
     </div>
-    <div class="scroll">
+    <div class="nav">
+      <button class="tbtn live" id="btnLive">● Live</button>
+      <button class="tbtn" id="btnUp" title="Neuere">▲</button>
+      <button class="tbtn" id="btnDown" title="Ältere">▼</button>
+      <input type="text" id="gotoLap" inputmode="numeric" placeholder="Gehe zu Runde #">
+      <span class="pos" id="pos"></span>
+    </div>
+    <div class="tablewrap" id="tablewrap">
       <table>
-        <thead><tr><th>#</th><th>Runde</th><th>Diff</th><th>Gesamt</th></tr></thead>
+        <thead><tr><th>#</th><th>Runde</th><th>Gesamt</th></tr></thead>
         <tbody id="lapBody"></tbody>
       </table>
-      <div class="empty" id="empty">Noch keine Runden – Start drücken und mit Leertaste / Tippen Runden nehmen.</div>
+      <div class="empty" id="empty">Noch keine Runden – Start drücken, dann Leertaste / Tippen oder Auto-Runden.</div>
     </div>
     <div class="stats">
       <div>Beste<b id="stBest">–</b></div>
@@ -175,57 +187,72 @@
 
 <script>
 (() => {
+  'use strict';
   const $ = id => document.getElementById(id);
+  const ROWS = 20;
+  const MIN_INT_US = 1;                 // 0,000001 s
+  const CSV_MAX = 1000000, COPY_MAX = 100000;
+  const KEY = 'speedclock.settings.v2';
+
+  /*
+   * Alle Zeiten in Mikrosekunden (µs). Runden werden NICHT einzeln gespeichert,
+   * sondern als "Läufe": {i0, t0, dt, n, prev, man}. Runde k eines Laufs endet bei
+   * t0 + (k+1)*dt; die erste Runde ist (Ende - prev) lang. So kosten auch
+   * Milliarden Auto-Runden nur ein paar Bytes – nichts kann abstürzen.
+   */
   const S = {
-    mode: 'sw',          // 'sw' stopwatch | 'cd' countdown
-    running: false,
-    startPerf: 0,        // performance.now() at (virtual) start
-    elapsed: 0,          // ms accumulated while paused
-    laps: [],            // {total, lap, auto}
-    nextAuto: 0,         // elapsed ms at which next auto lap fires
-    finished: false,
+    running: false, startPerf: 0, elapsed: 0, finished: false,
+    runs: [], closed: 0, closedTotal: 0,
+    auto: null,          // offener Auto-Lauf {t0, dt, prev}
+    autoOn: false,
+    viewTop: null,       // null = live (neueste oben), sonst Index der obersten Zeile
+    small: false,        // µs-Anzeige nötig?
   };
-  const KEY = 'speedclock.settings.v1';
 
-  // ---------- formatting ----------
-  function fmt(ms, withSign) {
-    const sign = ms < 0 ? '-' : (withSign ? '+' : '');
-    ms = Math.abs(ms);
-    const cs = Math.floor(ms / 10) % 100, s = Math.floor(ms / 1000) % 60,
-          m = Math.floor(ms / 60000) % 60, h = Math.floor(ms / 3600000);
-    const p = n => String(n).padStart(2, '0');
-    return sign + (h ? h + ':' + p(m) : p(m)) + ':' + p(s) + '.' + p(cs);
+  // ---------- Format ----------
+  const p2 = n => String(n).padStart(2, '0');
+  function fmt(us, dec, floor) {
+    const unit = 10 ** (6 - dec);
+    let v = floor ? Math.floor(us / unit + 1e-7) : Math.round(us / unit);
+    if (!isFinite(v) || v < 0) v = 0;
+    const scale = 10 ** dec;
+    const frac = v % scale; let s = Math.floor(v / scale);
+    const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; s %= 60;
+    return (h ? h + ':' + p2(m) : p2(m)) + ':' + p2(s) + '.' + String(frac).padStart(dec, '0');
   }
-  function fmtBig(ms) {
-    const f = fmt(ms), i = f.lastIndexOf('.');
-    return f.slice(0, i) + '<small>' + f.slice(i) + '</small>';
+  const dec = () => S.small ? 6 : 3;
+  const nf = new Intl.NumberFormat('de-DE');
+  const fmtN = n => nf.format(n);
+
+  // ---------- Einstellungen ----------
+  const parseNum = str => { const v = parseFloat(String(str).trim().replace(',', '.')); return isFinite(v) && v >= 0 ? v : NaN; };
+  function intervalUs() {
+    const v = parseNum($('autoInt').value);
+    const ok = isFinite(v) && v > 0;
+    $('autoInt').classList.toggle('bad', !ok);
+    return ok ? Math.max(MIN_INT_US, v * 1e6) : 0;
   }
-
-  // ---------- settings ----------
-  const num = (el, d = 0) => { const v = parseFloat(el.value); return isFinite(v) && v >= 0 ? v : d; };
-  const cdMs = () => (num($('cdMin')) * 60 + num($('cdSec'))) * 1000;
-  const autoMs = () => (num($('autoMin')) * 60 + num($('autoSec'))) * 1000;
-  const maxLaps = () => Math.floor(num($('maxLaps')));
-
+  function durationUs() {
+    const h = parseNum($('durH').value) || 0, m = parseNum($('durM').value) || 0, s = parseNum($('durS').value) || 0;
+    return Math.min((h * 3600 + m * 60 + s) * 1e6, 1e15);
+  }
   function save() {
     try {
       localStorage.setItem(KEY, JSON.stringify({
-        mode: S.mode, cdMin: $('cdMin').value, cdSec: $('cdSec').value, autoMin: $('autoMin').value,
-        autoSec: $('autoSec').value, maxLaps: $('maxLaps').value, beep: $('optBeep').checked,
-        vib: $('optVibrate').checked, wake: $('optWake').checked,
+        autoInt: $('autoInt').value, durH: $('durH').value, durM: $('durM').value, durS: $('durS').value,
+        beep: $('optBeep').checked, vib: $('optVibrate').checked, wake: $('optWake').checked,
       }));
     } catch (e) {}
   }
   function load() {
     try {
       const o = JSON.parse(localStorage.getItem(KEY) || 'null'); if (!o) return;
-      ['cdMin','cdSec','autoMin','autoSec','maxLaps'].forEach(k => { if (o[k] != null) $(k).value = o[k]; });
+      ['autoInt', 'durH', 'durM', 'durS'].forEach(k => { if (o[k] != null) $(k).value = o[k]; });
       $('optBeep').checked = o.beep !== false; $('optVibrate').checked = o.vib !== false; $('optWake').checked = o.wake !== false;
-      if (o.mode === 'cd') setMode('cd');
     } catch (e) {}
   }
 
-  // ---------- feedback ----------
+  // ---------- Feedback ----------
   let audio;
   function beep(freq = 880, dur = 0.08, times = 1) {
     if (!$('optBeep').checked) return;
@@ -240,9 +267,8 @@
       }
     } catch (e) {}
   }
-  const vibrate = p => { if ($('optVibrate').checked && navigator.vibrate) navigator.vibrate(p); };
+  const vibrate = p => { try { if ($('optVibrate').checked && navigator.vibrate) navigator.vibrate(p); } catch (e) {} };
   function flash() { const d = $('display'); d.classList.remove('flash'); void d.offsetWidth; d.classList.add('flash'); }
-
   let wakeLock = null;
   async function wake(on) {
     try {
@@ -252,162 +278,259 @@
       } else if (!on && wakeLock) { await wakeLock.release(); wakeLock = null; }
     } catch (e) {}
   }
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && S.running) wake(true); });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && S.running) { wake(true); tick(); }
+  });
 
-  // ---------- core ----------
-  const now = () => S.running ? S.elapsed + (performance.now() - S.startPerf) : S.elapsed;
-  const lastTotal = () => S.laps.length ? S.laps[S.laps.length - 1].total : 0;
+  // ---------- Kern ----------
+  function now() {
+    const raw = S.running ? S.elapsed + (performance.now() - S.startPerf) * 1000 : S.elapsed;
+    const d = durationUs();
+    return d > 0 ? Math.min(raw, d) : raw;
+  }
+  const openCount = t => S.auto ? Math.max(0, Math.floor((t - S.auto.t0) / S.auto.dt + 1e-9)) : 0;
+  const lapCount = t => S.closed + openCount(t);
+  const lastTotal = t => { const n = openCount(t); return n ? S.auto.t0 + n * S.auto.dt : S.closedTotal; };
+
+  function closeAuto(t) {
+    if (!S.auto) return;
+    const n = openCount(t);
+    if (n > 0) {
+      S.runs.push({ i0: S.closed, t0: S.auto.t0, dt: S.auto.dt, n, prev: S.auto.prev, man: false });
+      S.closed += n; S.closedTotal = S.auto.t0 + n * S.auto.dt;
+    }
+    S.auto = null;
+  }
+  function openAuto(anchor) {
+    const dt = intervalUs();
+    if (!S.autoOn || !dt) return;
+    S.auto = { t0: anchor, dt, prev: S.closedTotal };
+    if (dt < 1000) S.small = true;
+  }
 
   function start() {
     if (S.finished) reset();
-    if (S.mode === 'cd' && cdMs() <= 0) return;
+    const d = durationUs();
+    if (d > 0 && S.elapsed >= d) return;
     S.running = true; S.startPerf = performance.now();
-    if (!S.nextAuto && autoMs() > 0) S.nextAuto = lastTotal() + autoMs();
-    beep(1200, 0.05); wake(true); updateButtons(); loop();
+    if (S.autoOn && !S.auto) openAuto(S.elapsed);
+    beep(1200, 0.05); wake(true); updateButtons(); tick();
   }
   function stop() {
-    S.elapsed = now(); S.running = false; wake(false); updateButtons(); render();
+    S.elapsed = now(); S.running = false; wake(false); updateButtons(); render(true);
   }
   function reset() {
-    S.running = false; S.elapsed = 0; S.laps = []; S.nextAuto = 0; S.finished = false;
-    $('display').classList.remove('done'); wake(false); updateButtons(); renderLaps(); render();
+    S.running = false; S.elapsed = 0; S.finished = false; S.runs = []; S.closed = 0; S.closedTotal = 0;
+    S.auto = null; S.viewTop = null; S.small = false; lastBeepCount = 0;
+    $('display').classList.remove('done'); wake(false); updateButtons(); render(true);
   }
-  function lap(auto = false, at) {
-    if (!S.running && !auto) return;
-    const total = at != null ? at : now();
-    const l = total - lastTotal();
-    if (l <= 0) return;
-    S.laps.push({ total, lap: l, auto });
-    if (autoMs() > 0) S.nextAuto = total + autoMs();
-    beep(auto ? 660 : 880); vibrate(30); flash(); renderLaps();
-    if (maxLaps() > 0 && S.laps.length >= maxLaps()) finish(total);
-  }
-  function finish(at) {
-    S.elapsed = at; S.running = false; S.finished = true;
-    $('display').classList.add('done'); beep(520, 0.25, 3); vibrate([200, 100, 200, 100, 400]);
-    wake(false); updateButtons(); render();
-  }
-
-  function loop() {
+  function lap() {
     if (!S.running) return;
-    let t = now();
-    // auto laps (catch up precisely, even if tab was throttled)
-    while (S.running && autoMs() > 0 && S.nextAuto && t >= S.nextAuto) lap(true, S.nextAuto);
-    if (S.running && S.mode === 'cd' && t >= cdMs()) {
-      if (lastTotal() < cdMs()) S.laps.push({ total: cdMs(), lap: cdMs() - lastTotal(), auto: true });
-      renderLaps(); finish(cdMs());
-    }
-    render();
-    if (S.running) requestAnimationFrame(loop);
-  }
-  // keep auto-laps/countdown firing in background tabs
-  setInterval(() => { if (S.running && document.hidden) loop(); }, 250);
-
-  // ---------- render ----------
-  function render() {
     const t = now();
-    const shown = S.mode === 'cd' ? Math.max(0, cdMs() - t) : t;
-    $('time').innerHTML = fmtBig(shown);
-    $('lapNo').textContent = S.laps.length + 1;
-    $('lapTime').textContent = fmt(t - lastTotal());
-    const a = autoMs();
-    $('autoInfo').hidden = !(a > 0);
-    if (a > 0) $('autoLeft').textContent = S.nextAuto ? fmt(Math.max(0, S.nextAuto - t)) : fmt(a);
-    $('progressWrap').hidden = S.mode !== 'cd';
-    if (S.mode === 'cd') $('progress').style.width = Math.min(100, cdMs() ? t / cdMs() * 100 : 0) + '%';
+    closeAuto(t);
+    if (t - S.closedTotal >= 0.5) {
+      S.runs.push({ i0: S.closed, t0: S.closedTotal, dt: t - S.closedTotal, n: 1, prev: S.closedTotal, man: true });
+      S.closed++; S.closedTotal = t;
+    }
+    openAuto(t);
+    beep(880); vibrate(30); flash(); render(true);
   }
+  function setAuto(on) {
+    S.autoOn = on;
+    const b = $('btnAuto');
+    b.classList.toggle('on', on); b.setAttribute('aria-pressed', on);
+    b.innerHTML = 'AUTO-RUNDEN<br>' + (on ? 'AN' : 'AUS');
+    const t = now();
+    if (on) { if (!S.auto && (S.running || S.elapsed > 0)) openAuto(t); }
+    else closeAuto(t);
+    render(true);
+  }
+  function finish() {
+    S.elapsed = durationUs(); S.running = false; S.finished = true;
+    $('display').classList.add('done'); beep(520, 0.25, 3); vibrate([200, 100, 200, 100, 400]);
+    wake(false); updateButtons(); render(true);
+  }
+
+  // Runde i (0-basiert) berechnen
+  function getLap(i) {
+    let r, k;
+    if (i >= S.closed) { r = S.auto; k = i - S.closed; }
+    else {
+      let lo = 0, hi = S.runs.length - 1;
+      while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (S.runs[mid].i0 <= i) lo = mid; else hi = mid - 1; }
+      r = S.runs[lo]; k = i - r.i0;
+    }
+    const total = r.t0 + (k + 1) * r.dt;
+    return { total, lap: k === 0 ? total - r.prev : r.dt, man: !!r.man };
+  }
+  function stats(t) {
+    const n = lapCount(t); if (!n) return null;
+    let best = Infinity, worst = 0;
+    const add = (r, cnt) => {
+      const first = r.t0 + r.dt - r.prev;
+      best = Math.min(best, first); worst = Math.max(worst, first);
+      if (cnt > 1) { best = Math.min(best, r.dt); worst = Math.max(worst, r.dt); }
+    };
+    S.runs.forEach(r => add(r, r.n));
+    if (S.auto && openCount(t)) add(S.auto, openCount(t));
+    return { n, best, worst, avg: lastTotal(t) / n };
+  }
+
+  // ---------- Darstellung ----------
+  let lastTable = 0, lastBeepCount = 0;
+  function tick() {
+    if (!S.running) return;
+    const d = durationUs();
+    if (d > 0 && S.elapsed + (performance.now() - S.startPerf) * 1000 >= d) { finish(); return; }
+    const c = lapCount(now());
+    if (S.auto && S.auto.dt >= 250000 && c > lastBeepCount) { beep(660); vibrate(20); flash(); }
+    lastBeepCount = c;
+    render(false);
+    if (!document.hidden) requestAnimationFrame(tick);
+  }
+  setInterval(() => { if (S.running && document.hidden) tick(); }, 250);
+
+  function render(force) {
+    const t = now(), n = lapCount(t), d = durationUs();
+    const f = fmt(t, 3, true), i = f.lastIndexOf('.');
+    $('time').innerHTML = f.slice(0, i) + '<small>' + f.slice(i) + '</small>';
+    $('lapCountBig').textContent = fmtN(n);
+    $('lapTime').textContent = fmt(t - lastTotal(t), dec(), true);
+    $('rateInfo').hidden = !S.auto;
+    if (S.auto) $('rate').textContent = fmtN(Math.round(1e6 / S.auto.dt * 1000) / 1000);
+    $('remInfo').hidden = !(d > 0); $('progressWrap').hidden = !(d > 0);
+    if (d > 0) { $('remain').textContent = fmt(d - t, 3, false); $('progress').style.width = Math.min(100, t / d * 100) + '%'; }
+    const ms = performance.now();
+    if (force || ms - lastTable > 100) { lastTable = ms; renderTable(t, n); }
+  }
+
+  function renderTable(t, n) {
+    $('empty').hidden = n > 0;
+    let top = S.viewTop == null ? n - 1 : Math.min(S.viewTop, n - 1);
+    top = Math.max(top, Math.min(ROWS - 1, n - 1));
+    if (S.viewTop != null) S.viewTop = top;
+    $('btnLive').classList.toggle('live', S.viewTop == null);
+    const st = stats(t), D = dec();
+    const mark = st && st.best !== st.worst;
+    let html = '';
+    for (let i = top; i > top - ROWS && i >= 0; i--) {
+      const l = getLap(i);
+      const cls = (mark && l.lap === st.best ? 'best ' : '') + (mark && l.lap === st.worst ? 'worst ' : '') + (l.man ? 'man' : '');
+      html += `<tr class="${cls}"><td>${fmtN(i + 1)}</td><td>${fmt(l.lap, D)}</td><td>${fmt(l.total, D)}</td></tr>`;
+    }
+    $('lapBody').innerHTML = html;
+    $('pos').textContent = n ? `#${fmtN(Math.max(1, top - ROWS + 2))}–${fmtN(top + 1)} von ${fmtN(n)}` : '';
+    if (st) {
+      $('stBest').textContent = fmt(st.best, D); $('stWorst').textContent = fmt(st.worst, D); $('stAvg').textContent = fmt(st.avg, D);
+    } else ['stBest', 'stAvg', 'stWorst'].forEach(k => $(k).textContent = '–');
+  }
+
+  function scrollBy(rows) { // positiv = ältere
+    const n = lapCount(now()); if (!n) return;
+    const cur = S.viewTop == null ? n - 1 : S.viewTop;
+    const nt = cur - rows;
+    S.viewTop = nt >= n - 1 ? null : Math.max(Math.min(ROWS - 1, n - 1), nt);
+    render(true);
+  }
+
   function updateButtons() {
     const b = $('btnStart');
     b.textContent = S.running ? 'Stopp' : (S.elapsed > 0 && !S.finished ? 'Weiter' : 'Start');
     b.classList.toggle('running', S.running);
     $('btnLap').disabled = !S.running;
   }
-  function renderLaps() {
-    const body = $('lapBody'), L = S.laps;
-    $('empty').hidden = L.length > 0;
-    $('lapCount').textContent = L.length ? '(' + L.length + ')' : '';
-    let best = -1, worst = -1;
-    if (L.length > 1) {
-      L.forEach((l, i) => {
-        if (best < 0 || l.lap < L[best].lap) best = i;
-        if (worst < 0 || l.lap > L[worst].lap) worst = i;
-      });
-    }
-    let html = '';
-    for (let i = L.length - 1; i >= 0; i--) {
-      const l = L[i], diff = i ? fmt(l.lap - L[i - 1].lap, true) : '';
-      const cls = [i === best ? 'best' : '', i === worst ? 'worst' : '', l.auto ? 'auto' : ''].join(' ');
-      html += `<tr class="${cls}"><td>${i + 1}</td><td>${fmt(l.lap)}</td><td>${diff}</td><td>${fmt(l.total)}</td></tr>`;
-    }
-    body.innerHTML = html;
-    if (L.length) {
-      const sum = L.reduce((a, l) => a + l.lap, 0);
-      $('stBest').textContent = fmt(Math.min(...L.map(l => l.lap)));
-      $('stWorst').textContent = fmt(Math.max(...L.map(l => l.lap)));
-      $('stAvg').textContent = fmt(sum / L.length);
-    } else ['stBest','stAvg','stWorst'].forEach(k => $(k).textContent = '–');
-  }
 
-  function setMode(m) {
-    if (S.running) return;
-    S.mode = m; reset();
-    $('modeSw').classList.toggle('on', m === 'sw'); $('modeCd').classList.toggle('on', m === 'cd');
-    $('cdField').hidden = m !== 'cd'; save();
-  }
-
-  // ---------- export ----------
-  function csv() {
-    return 'Runde;Rundenzeit;Gesamt;Auto\n' +
-      S.laps.map((l, i) => [i + 1, fmt(l.lap), fmt(l.total), l.auto ? 'ja' : ''].join(';')).join('\n');
+  // ---------- Export (gedeckelt, damit nichts abstürzt) ----------
+  function buildText(max, sep) {
+    const t = now(), n = lapCount(t), m = Math.min(n, max), D = dec();
+    const parts = ['Runde' + sep + 'Rundenzeit' + sep + 'Gesamt' + sep + 'Manuell\n'];
+    let chunk = [];
+    for (let i = 0; i < m; i++) {
+      const l = getLap(i);
+      chunk.push((i + 1) + sep + fmt(l.lap, D) + sep + fmt(l.total, D) + sep + (l.man ? 'ja' : ''));
+      if (chunk.length === 10000) { parts.push(chunk.join('\n') + '\n'); chunk = []; }
+    }
+    if (chunk.length) parts.push(chunk.join('\n') + '\n');
+    return { parts, n, m };
   }
   $('btnCsv').onclick = () => {
-    if (!S.laps.length) return;
+    if (!lapCount(now())) return;
+    const { parts, n, m } = buildText(CSV_MAX, ';');
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([csv()], { type: 'text/csv' }));
+    a.href = URL.createObjectURL(new Blob(parts, { type: 'text/csv' }));
     a.download = 'runden-' + new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-') + '.csv';
-    a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    if (n > m) alert(`Exportiert wurden die ersten ${fmtN(m)} von ${fmtN(n)} Runden.`);
   };
   $('btnCopy').onclick = async () => {
-    if (!S.laps.length) return;
-    try { await navigator.clipboard.writeText(csv().replace(/;/g, '\t')); $('btnCopy').textContent = 'Kopiert ✓'; }
+    if (!lapCount(now())) return;
+    const { parts, n, m } = buildText(COPY_MAX, '\t');
+    try { await navigator.clipboard.writeText(parts.join('')); $('btnCopy').textContent = n > m ? `${fmtN(m)} kopiert` : 'Kopiert ✓'; }
     catch (e) { $('btnCopy').textContent = 'Fehler'; }
-    setTimeout(() => $('btnCopy').textContent = 'Kopieren', 1500);
+    setTimeout(() => $('btnCopy').textContent = 'Kopieren', 2000);
   };
 
-  // ---------- input ----------
+  // ---------- Eingaben ----------
   $('btnStart').onclick = () => S.running ? stop() : start();
-  $('btnLap').onclick = () => lap();
-  $('btnReset').onclick = () => { if (S.running) stop(); reset(); };
+  $('btnLap').onclick = lap;
+  $('btnReset').onclick = reset;
+  $('btnAuto').onclick = () => setAuto(!S.autoOn);
   $('display').addEventListener('pointerdown', e => { e.preventDefault(); S.running ? lap() : start(); });
-  $('modeSw').onclick = () => setMode('sw');
-  $('modeCd').onclick = () => setMode('cd');
+  $('btnLive').onclick = () => { S.viewTop = null; render(true); };
+  $('btnUp').onclick = () => scrollBy(-ROWS);
+  $('btnDown').onclick = () => scrollBy(ROWS);
+  $('tablewrap').addEventListener('wheel', e => {
+    if (!lapCount(now())) return;
+    e.preventDefault(); scrollBy(Math.sign(e.deltaY) * 3);
+  }, { passive: false });
+  let touchY = null;
+  $('tablewrap').addEventListener('touchstart', e => { touchY = e.touches[0].clientY; }, { passive: true });
+  $('tablewrap').addEventListener('touchmove', e => {
+    if (touchY == null || !lapCount(now())) return;
+    e.preventDefault();
+    const dy = touchY - e.touches[0].clientY, rows = Math.trunc(dy / 32);
+    if (rows) { scrollBy(rows); touchY -= rows * 32; }
+  }, { passive: false });
+  $('gotoLap').addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    const v = parseInt(e.target.value.replace(/\D/g, ''), 10), n = lapCount(now());
+    if (v >= 1 && n) { const top = Math.min(v - 1 + Math.floor(ROWS / 2), n - 1); S.viewTop = top >= n - 1 ? null : top; render(true); }
+  });
 
   document.addEventListener('keydown', e => {
     if (e.target.tagName === 'INPUT') { if (e.key === 'Enter') e.target.blur(); return; }
-    if (e.repeat) return;
+    if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.code === 'Space' || e.key === 'l' || e.key === 'L') { e.preventDefault(); S.running ? lap() : start(); }
     else if (e.key === 'Enter') { e.preventDefault(); S.running ? stop() : start(); }
-    else if (e.key === 'r' || e.key === 'R') { if (S.running) stop(); reset(); }
+    else if (e.key === 'a' || e.key === 'A') setAuto(!S.autoOn);
+    else if (e.key === 'r' || e.key === 'R') reset();
   });
 
-  function presets(box, minEl, secEl) {
-    box.addEventListener('click', e => {
-      const s = e.target.dataset.s; if (s == null) return;
-      minEl.value = Math.floor(s / 60); secEl.value = s % 60; onSettings();
-    });
-  }
-  presets($('cdPresets'), $('cdMin'), $('cdSec'));
-  presets($('autoPresets'), $('autoMin'), $('autoSec'));
+  function setDurSeconds(s) { $('durH').value = Math.floor(s / 3600); $('durM').value = Math.floor(s / 60) % 60; $('durS').value = s % 60; onDur(); }
+  $('durPresets').addEventListener('click', e => { const s = e.target.dataset.s; if (s != null) setDurSeconds(+s); });
+  $('autoPresets').addEventListener('click', e => {
+    const s = e.target.dataset.s; if (s == null) return;
+    $('autoInt').value = s.replace('.', ','); onInterval();
+    if (!S.autoOn) setAuto(true);
+  });
 
-  function onSettings() {
-    // re-arm auto lap from the last lap mark
-    S.nextAuto = autoMs() > 0 && (S.running || S.elapsed > 0) ? lastTotal() + autoMs() : 0;
-    if (S.nextAuto && S.nextAuto <= now()) S.nextAuto = now() + autoMs();
-    save(); render();
+  function onInterval() {
+    intervalUs(); save();
+    if (S.auto) { closeAuto(now()); openAuto(S.closedTotal); }
+    render(true);
   }
-  document.querySelectorAll('input').forEach(el => el.addEventListener('input', onSettings));
+  function onDur() {
+    save();
+    const d = durationUs();
+    if (S.finished && (d === 0 || d > S.elapsed)) { S.finished = false; $('display').classList.remove('done'); updateButtons(); }
+    if (S.running && d > 0 && S.elapsed + (performance.now() - S.startPerf) * 1000 >= d) finish();
+    render(true);
+  }
+  $('autoInt').addEventListener('input', onInterval);
+  ['durH', 'durM', 'durS'].forEach(k => $(k).addEventListener('input', onDur));
+  ['optBeep', 'optVibrate', 'optWake'].forEach(k => $(k).addEventListener('change', save));
 
-  load(); updateButtons(); renderLaps(); render();
+  load(); intervalUs(); updateButtons(); render(true);
 })();
 </script>
 </body>
