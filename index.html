@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cut">
+<meta name="theme-color" content="#0b0f17">
+<title>Speed Clock</title>
+<style>
+  :root {
+    --bg: #0b0f17; --panel: #141a26; --panel2: #1c2333; --text: #e8edf6; --muted: #8a95ab;
+    --accent: #3ddc97; --accent2: #4aa3ff; --danger: #ff5d6c; --warn: #ffb547; --border: #263047;
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --bg: #f4f6fa; --panel: #fff; --panel2: #eef1f7; --text: #121826; --muted: #5b667d;
+      --accent: #12a66a; --accent2: #1f6fd1; --danger: #d92d3e; --warn: #c27a00; --border: #d8deea; }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  body { min-height: 100dvh; display: flex; flex-direction: column; align-items: center;
+    padding: max(16px, env(safe-area-inset-top)) 16px 24px; -webkit-tap-highlight-color: transparent; }
+  main { width: 100%; max-width: 720px; display: flex; flex-direction: column; gap: 14px; }
+  header { display: flex; justify-content: space-between; align-items: center; }
+  h1 { font-size: 1.1rem; margin: 0; letter-spacing: .04em; }
+  .tabs { display: flex; background: var(--panel); border: 1px solid var(--border); border-radius: 999px; padding: 3px; }
+  .tabs button { border: 0; background: none; color: var(--muted); padding: 6px 14px; border-radius: 999px;
+    font: inherit; font-size: .9rem; cursor: pointer; }
+  .tabs button.on { background: var(--panel2); color: var(--text); font-weight: 600; }
+
+  .display { background: var(--panel); border: 1px solid var(--border); border-radius: 20px;
+    padding: 20px 16px; text-align: center; user-select: none; cursor: pointer; position: relative; }
+  .time { font-variant-numeric: tabular-nums; font-weight: 700; font-size: clamp(3rem, 15vw, 6.5rem);
+    line-height: 1; letter-spacing: -.02em; }
+  .time small { font-size: .45em; color: var(--muted); font-weight: 600; }
+  .sub { margin-top: 10px; color: var(--muted); font-variant-numeric: tabular-nums; display: flex;
+    justify-content: center; gap: 18px; flex-wrap: wrap; font-size: .95rem; }
+  .sub b { color: var(--text); }
+  .progress { height: 6px; background: var(--panel2); border-radius: 3px; margin-top: 14px; overflow: hidden; }
+  .progress > i { display: block; height: 100%; width: 0; background: var(--accent2); }
+  .display.done .time { color: var(--danger); animation: blink .5s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: .3; } }
+  .flash { animation: flash .25s ease-out; }
+  @keyframes flash { from { box-shadow: 0 0 0 4px var(--accent); } to { box-shadow: 0 0 0 0 transparent; } }
+
+  .controls { display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 10px; }
+  .controls button { border: 0; border-radius: 16px; font: inherit; font-weight: 700; font-size: 1.1rem;
+    padding: 18px 8px; cursor: pointer; color: #fff; touch-action: manipulation; }
+  .controls button:active { transform: scale(.97); }
+  .controls button:disabled { opacity: .35; cursor: default; transform: none; }
+  #btnStart { background: var(--accent); color: #062b1b; }
+  #btnStart.running { background: var(--danger); color: #fff; }
+  #btnLap { background: var(--accent2); font-size: 1.5rem; }
+  #btnReset { background: var(--panel2); color: var(--text); border: 1px solid var(--border); }
+  .hint { text-align: center; color: var(--muted); font-size: .8rem; }
+  kbd { background: var(--panel2); border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; font-size: .75rem; }
+
+  details { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 4px 16px; }
+  summary { cursor: pointer; padding: 10px 0; font-weight: 600; }
+  .settings { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; padding: 6px 0 14px; }
+  .field { display: flex; flex-direction: column; gap: 6px; font-size: .88rem; color: var(--muted); }
+  .field .row { display: flex; gap: 6px; align-items: center; color: var(--text); }
+  input[type=number] { width: 100%; min-width: 0; background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 10px; padding: 9px 10px; font: inherit; font-variant-numeric: tabular-nums; }
+  .check { flex-direction: row; align-items: center; gap: 8px; color: var(--text); }
+  .check input { width: 20px; height: 20px; accent-color: var(--accent); }
+  .presets { display: flex; gap: 6px; flex-wrap: wrap; }
+  .presets button { background: var(--panel2); border: 1px solid var(--border); color: var(--text); border-radius: 8px;
+    padding: 5px 10px; font: inherit; font-size: .82rem; cursor: pointer; }
+
+  .laps { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
+  .laps-head { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+  .laps-head h2 { margin: 0; font-size: 1rem; }
+  .laps-head .act { display: flex; gap: 6px; }
+  .laps-head button { background: var(--panel2); border: 1px solid var(--border); color: var(--text); border-radius: 8px;
+    padding: 5px 10px; font: inherit; font-size: .82rem; cursor: pointer; }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { padding: 9px 16px; text-align: right; }
+  th { color: var(--muted); font-weight: 500; font-size: .8rem; text-align: right; position: sticky; top: 0; background: var(--panel); }
+  th:first-child, td:first-child { text-align: left; }
+  tbody tr:nth-child(odd) { background: color-mix(in srgb, var(--panel2) 50%, transparent); }
+  tr.best td:nth-child(2) { color: var(--accent); font-weight: 700; }
+  tr.worst td:nth-child(2) { color: var(--danger); font-weight: 700; }
+  tr.auto td:first-child::after { content: " ⟳"; color: var(--muted); }
+  .scroll { max-height: 50vh; overflow-y: auto; }
+  .empty { padding: 22px; text-align: center; color: var(--muted); }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); text-align: center; border-top: 1px solid var(--border); }
+  .stats div { padding: 10px 4px; font-size: .78rem; color: var(--muted); }
+  .stats b { display: block; color: var(--text); font-size: 1rem; font-variant-numeric: tabular-nums; }
+  @media (max-width: 480px) { th, td { padding: 8px 10px; } .controls button { padding: 16px 4px; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>⏱ SPEED CLOCK</h1>
+    <div class="tabs" role="tablist">
+      <button id="modeSw" class="on" role="tab">Stoppuhr</button>
+      <button id="modeCd" role="tab">Countdown</button>
+    </div>
+  </header>
+
+  <section class="display" id="display" title="Tippen = Runde">
+    <div class="time" id="time">00:00<small>.00</small></div>
+    <div class="sub">
+      <span>Runde <b id="lapNo">1</b></span>
+      <span>Rundenzeit <b id="lapTime">00:00.00</b></span>
+      <span id="autoInfo" hidden>Auto in <b id="autoLeft">–</b></span>
+    </div>
+    <div class="progress" id="progressWrap" hidden><i id="progress"></i></div>
+  </section>
+
+  <div class="controls">
+    <button id="btnReset">Reset</button>
+    <button id="btnLap" disabled>Runde</button>
+    <button id="btnStart">Start</button>
+  </div>
+  <div class="hint"><kbd>Leertaste</kbd> Runde · <kbd>Enter</kbd> Start/Stopp · <kbd>R</kbd> Reset · Anzeige antippen = Runde</div>
+
+  <details id="settingsBox" open>
+    <summary>Einstellungen</summary>
+    <div class="settings">
+      <div class="field" id="cdField" hidden>
+        Countdown-Zeit
+        <div class="row">
+          <input type="number" id="cdMin" min="0" max="999" value="5" aria-label="Minuten"> min
+          <input type="number" id="cdSec" min="0" max="59" value="0" aria-label="Sekunden"> s
+        </div>
+        <div class="presets" id="cdPresets">
+          <button data-s="30">30 s</button><button data-s="60">1 min</button><button data-s="180">3 min</button>
+          <button data-s="300">5 min</button><button data-s="600">10 min</button>
+        </div>
+      </div>
+      <div class="field">
+        Auto-Runde alle … (0 = aus)
+        <div class="row">
+          <input type="number" id="autoMin" min="0" max="999" value="0" aria-label="Minuten"> min
+          <input type="number" id="autoSec" min="0" max="59" step="0.5" value="0" aria-label="Sekunden"> s
+        </div>
+        <div class="presets" id="autoPresets">
+          <button data-s="0">Aus</button><button data-s="10">10 s</button><button data-s="30">30 s</button>
+          <button data-s="60">1 min</button><button data-s="120">2 min</button>
+        </div>
+      </div>
+      <div class="field">
+        Automatisch stoppen nach … Runden (0 = nie)
+        <div class="row"><input type="number" id="maxLaps" min="0" max="9999" value="0"></div>
+      </div>
+      <div class="field" style="gap:10px">
+        <label class="field check"><input type="checkbox" id="optBeep" checked> Ton bei Runde / Ende</label>
+        <label class="field check"><input type="checkbox" id="optVibrate" checked> Vibration (Handy)</label>
+        <label class="field check"><input type="checkbox" id="optWake" checked> Bildschirm wach halten</label>
+      </div>
+    </div>
+  </details>
+
+  <section class="laps">
+    <div class="laps-head">
+      <h2>Runden <span id="lapCount" style="color:var(--muted);font-weight:500"></span></h2>
+      <div class="act"><button id="btnCopy">Kopieren</button><button id="btnCsv">CSV</button></div>
+    </div>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>#</th><th>Runde</th><th>Diff</th><th>Gesamt</th></tr></thead>
+        <tbody id="lapBody"></tbody>
+      </table>
+      <div class="empty" id="empty">Noch keine Runden – Start drücken und mit Leertaste / Tippen Runden nehmen.</div>
+    </div>
+    <div class="stats">
+      <div>Beste<b id="stBest">–</b></div>
+      <div>Schnitt<b id="stAvg">–</b></div>
+      <div>Langsamste<b id="stWorst">–</b></div>
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const S = {
+    mode: 'sw',          // 'sw' stopwatch | 'cd' countdown
+    running: false,
+    startPerf: 0,        // performance.now() at (virtual) start
+    elapsed: 0,          // ms accumulated while paused
+    laps: [],            // {total, lap, auto}
+    nextAuto: 0,         // elapsed ms at which next auto lap fires
+    finished: false,
+  };
+  const KEY = 'speedclock.settings.v1';
+
+  // ---------- formatting ----------
+  function fmt(ms, withSign) {
+    const sign = ms < 0 ? '-' : (withSign ? '+' : '');
+    ms = Math.abs(ms);
+    const cs = Math.floor(ms / 10) % 100, s = Math.floor(ms / 1000) % 60,
+          m = Math.floor(ms / 60000) % 60, h = Math.floor(ms / 3600000);
+    const p = n => String(n).padStart(2, '0');
+    return sign + (h ? h + ':' + p(m) : p(m)) + ':' + p(s) + '.' + p(cs);
+  }
+  function fmtBig(ms) {
+    const f = fmt(ms), i = f.lastIndexOf('.');
+    return f.slice(0, i) + '<small>' + f.slice(i) + '</small>';
+  }
+
+  // ---------- settings ----------
+  const num = (el, d = 0) => { const v = parseFloat(el.value); return isFinite(v) && v >= 0 ? v : d; };
+  const cdMs = () => (num($('cdMin')) * 60 + num($('cdSec'))) * 1000;
+  const autoMs = () => (num($('autoMin')) * 60 + num($('autoSec'))) * 1000;
+  const maxLaps = () => Math.floor(num($('maxLaps')));
+
+  function save() {
+    try {
+      localStorage.setItem(KEY, JSON.stringify({
+        mode: S.mode, cdMin: $('cdMin').value, cdSec: $('cdSec').value, autoMin: $('autoMin').value,
+        autoSec: $('autoSec').value, maxLaps: $('maxLaps').value, beep: $('optBeep').checked,
+        vib: $('optVibrate').checked, wake: $('optWake').checked,
+      }));
+    } catch (e) {}
+  }
+  function load() {
+    try {
+      const o = JSON.parse(localStorage.getItem(KEY) || 'null'); if (!o) return;
+      ['cdMin','cdSec','autoMin','autoSec','maxLaps'].forEach(k => { if (o[k] != null) $(k).value = o[k]; });
+      $('optBeep').checked = o.beep !== false; $('optVibrate').checked = o.vib !== false; $('optWake').checked = o.wake !== false;
+      if (o.mode === 'cd') setMode('cd');
+    } catch (e) {}
+  }
+
+  // ---------- feedback ----------
+  let audio;
+  function beep(freq = 880, dur = 0.08, times = 1) {
+    if (!$('optBeep').checked) return;
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      for (let i = 0; i < times; i++) {
+        const t = audio.currentTime + i * (dur + 0.07);
+        const o = audio.createOscillator(), g = audio.createGain();
+        o.frequency.value = freq; o.connect(g); g.connect(audio.destination);
+        g.gain.setValueAtTime(0.25, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+        o.start(t); o.stop(t + dur);
+      }
+    } catch (e) {}
+  }
+  const vibrate = p => { if ($('optVibrate').checked && navigator.vibrate) navigator.vibrate(p); };
+  function flash() { const d = $('display'); d.classList.remove('flash'); void d.offsetWidth; d.classList.add('flash'); }
+
+  let wakeLock = null;
+  async function wake(on) {
+    try {
+      if (on && $('optWake').checked && 'wakeLock' in navigator && !wakeLock) {
+        wakeLock = await navigator.wakeLock.request('screen');
+        wakeLock.addEventListener('release', () => wakeLock = null);
+      } else if (!on && wakeLock) { await wakeLock.release(); wakeLock = null; }
+    } catch (e) {}
+  }
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && S.running) wake(true); });
+
+  // ---------- core ----------
+  const now = () => S.running ? S.elapsed + (performance.now() - S.startPerf) : S.elapsed;
+  const lastTotal = () => S.laps.length ? S.laps[S.laps.length - 1].total : 0;
+
+  function start() {
+    if (S.finished) reset();
+    if (S.mode === 'cd' && cdMs() <= 0) return;
+    S.running = true; S.startPerf = performance.now();
+    if (!S.nextAuto && autoMs() > 0) S.nextAuto = lastTotal() + autoMs();
+    beep(1200, 0.05); wake(true); updateButtons(); loop();
+  }
+  function stop() {
+    S.elapsed = now(); S.running = false; wake(false); updateButtons(); render();
+  }
+  function reset() {
+    S.running = false; S.elapsed = 0; S.laps = []; S.nextAuto = 0; S.finished = false;
+    $('display').classList.remove('done'); wake(false); updateButtons(); renderLaps(); render();
+  }
+  function lap(auto = false, at) {
+    if (!S.running && !auto) return;
+    const total = at != null ? at : now();
+    const l = total - lastTotal();
+    if (l <= 0) return;
+    S.laps.push({ total, lap: l, auto });
+    if (autoMs() > 0) S.nextAuto = total + autoMs();
+    beep(auto ? 660 : 880); vibrate(30); flash(); renderLaps();
+    if (maxLaps() > 0 && S.laps.length >= maxLaps()) finish(total);
+  }
+  function finish(at) {
+    S.elapsed = at; S.running = false; S.finished = true;
+    $('display').classList.add('done'); beep(520, 0.25, 3); vibrate([200, 100, 200, 100, 400]);
+    wake(false); updateButtons(); render();
+  }
+
+  function loop() {
+    if (!S.running) return;
+    let t = now();
+    // auto laps (catch up precisely, even if tab was throttled)
+    while (S.running && autoMs() > 0 && S.nextAuto && t >= S.nextAuto) lap(true, S.nextAuto);
+    if (S.running && S.mode === 'cd' && t >= cdMs()) {
+      if (lastTotal() < cdMs()) S.laps.push({ total: cdMs(), lap: cdMs() - lastTotal(), auto: true });
+      renderLaps(); finish(cdMs());
+    }
+    render();
+    if (S.running) requestAnimationFrame(loop);
+  }
+  // keep auto-laps/countdown firing in background tabs
+  setInterval(() => { if (S.running && document.hidden) loop(); }, 250);
+
+  // ---------- render ----------
+  function render() {
+    const t = now();
+    const shown = S.mode === 'cd' ? Math.max(0, cdMs() - t) : t;
+    $('time').innerHTML = fmtBig(shown);
+    $('lapNo').textContent = S.laps.length + 1;
+    $('lapTime').textContent = fmt(t - lastTotal());
+    const a = autoMs();
+    $('autoInfo').hidden = !(a > 0);
+    if (a > 0) $('autoLeft').textContent = S.nextAuto ? fmt(Math.max(0, S.nextAuto - t)) : fmt(a);
+    $('progressWrap').hidden = S.mode !== 'cd';
+    if (S.mode === 'cd') $('progress').style.width = Math.min(100, cdMs() ? t / cdMs() * 100 : 0) + '%';
+  }
+  function updateButtons() {
+    const b = $('btnStart');
+    b.textContent = S.running ? 'Stopp' : (S.elapsed > 0 && !S.finished ? 'Weiter' : 'Start');
+    b.classList.toggle('running', S.running);
+    $('btnLap').disabled = !S.running;
+  }
+  function renderLaps() {
+    const body = $('lapBody'), L = S.laps;
+    $('empty').hidden = L.length > 0;
+    $('lapCount').textContent = L.length ? '(' + L.length + ')' : '';
+    let best = -1, worst = -1;
+    if (L.length > 1) {
+      L.forEach((l, i) => {
+        if (best < 0 || l.lap < L[best].lap) best = i;
+        if (worst < 0 || l.lap > L[worst].lap) worst = i;
+      });
+    }
+    let html = '';
+    for (let i = L.length - 1; i >= 0; i--) {
+      const l = L[i], diff = i ? fmt(l.lap - L[i - 1].lap, true) : '';
+      const cls = [i === best ? 'best' : '', i === worst ? 'worst' : '', l.auto ? 'auto' : ''].join(' ');
+      html += `<tr class="${cls}"><td>${i + 1}</td><td>${fmt(l.lap)}</td><td>${diff}</td><td>${fmt(l.total)}</td></tr>`;
+    }
+    body.innerHTML = html;
+    if (L.length) {
+      const sum = L.reduce((a, l) => a + l.lap, 0);
+      $('stBest').textContent = fmt(Math.min(...L.map(l => l.lap)));
+      $('stWorst').textContent = fmt(Math.max(...L.map(l => l.lap)));
+      $('stAvg').textContent = fmt(sum / L.length);
+    } else ['stBest','stAvg','stWorst'].forEach(k => $(k).textContent = '–');
+  }
+
+  function setMode(m) {
+    if (S.running) return;
+    S.mode = m; reset();
+    $('modeSw').classList.toggle('on', m === 'sw'); $('modeCd').classList.toggle('on', m === 'cd');
+    $('cdField').hidden = m !== 'cd'; save();
+  }
+
+  // ---------- export ----------
+  function csv() {
+    return 'Runde;Rundenzeit;Gesamt;Auto\n' +
+      S.laps.map((l, i) => [i + 1, fmt(l.lap), fmt(l.total), l.auto ? 'ja' : ''].join(';')).join('\n');
+  }
+  $('btnCsv').onclick = () => {
+    if (!S.laps.length) return;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv()], { type: 'text/csv' }));
+    a.download = 'runden-' + new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-') + '.csv';
+    a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  };
+  $('btnCopy').onclick = async () => {
+    if (!S.laps.length) return;
+    try { await navigator.clipboard.writeText(csv().replace(/;/g, '\t')); $('btnCopy').textContent = 'Kopiert ✓'; }
+    catch (e) { $('btnCopy').textContent = 'Fehler'; }
+    setTimeout(() => $('btnCopy').textContent = 'Kopieren', 1500);
+  };
+
+  // ---------- input ----------
+  $('btnStart').onclick = () => S.running ? stop() : start();
+  $('btnLap').onclick = () => lap();
+  $('btnReset').onclick = () => { if (S.running) stop(); reset(); };
+  $('display').addEventListener('pointerdown', e => { e.preventDefault(); S.running ? lap() : start(); });
+  $('modeSw').onclick = () => setMode('sw');
+  $('modeCd').onclick = () => setMode('cd');
+
+  document.addEventListener('keydown', e => {
+    if (e.target.tagName === 'INPUT') { if (e.key === 'Enter') e.target.blur(); return; }
+    if (e.repeat) return;
+    if (e.code === 'Space' || e.key === 'l' || e.key === 'L') { e.preventDefault(); S.running ? lap() : start(); }
+    else if (e.key === 'Enter') { e.preventDefault(); S.running ? stop() : start(); }
+    else if (e.key === 'r' || e.key === 'R') { if (S.running) stop(); reset(); }
+  });
+
+  function presets(box, minEl, secEl) {
+    box.addEventListener('click', e => {
+      const s = e.target.dataset.s; if (s == null) return;
+      minEl.value = Math.floor(s / 60); secEl.value = s % 60; onSettings();
+    });
+  }
+  presets($('cdPresets'), $('cdMin'), $('cdSec'));
+  presets($('autoPresets'), $('autoMin'), $('autoSec'));
+
+  function onSettings() {
+    // re-arm auto lap from the last lap mark
+    S.nextAuto = autoMs() > 0 && (S.running || S.elapsed > 0) ? lastTotal() + autoMs() : 0;
+    if (S.nextAuto && S.nextAuto <= now()) S.nextAuto = now() + autoMs();
+    save(); render();
+  }
+  document.querySelectorAll('input').forEach(el => el.addEventListener('input', onSettings));
+
+  load(); updateButtons(); renderLaps(); render();
+})();
+</script>
+</body>
+</html>
