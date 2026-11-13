@@ -6,15 +6,15 @@
   /* ================= Einstellungen ================= */
   const CFG_KEY = 'speedclock.cfg.v3', SESSION_KEY = 'speedclock.session.v3';
   const DEFAULTS = {
-    intVal: '1', intUnit: 'us', autoOnStart: false, maxLaps: 0, debounce: '0',
+    intVal: '1', intUnit: 'ns', autoOnStart: false, maxLaps: 0, debounce: '0',
     durH: 0, durM: 0, durS: '0', delay: '0',
     theme: 'auto', accent: '#3ddc97', decimals: 'auto', rows: '20', showList: true, showHints: true,
     beep: true, volume: 0.5, vibrate: true, wake: true,
     csvMax: '100000', restore: true, pinHash: '',
   };
   let CFG = { ...DEFAULTS };
-  const UNIT_US = { us: 1, ms: 1e3, s: 1e6, min: 6e7 };
-  const MIN_INT_US = 1;
+  const UNIT_US = { ns: 1e-3, us: 1, ms: 1e3, s: 1e6, min: 6e7 };
+  const MIN_INT_US = 1e-3; // 1 ns = 1 Milliarde Runden/s
   const COPY_MAX = 10000;
 
   const parseNum = v => { const n = parseFloat(String(v).trim().replace(',', '.')); return isFinite(n) && n >= 0 ? n : NaN; };
@@ -41,7 +41,7 @@
   const S = {
     running: false, startPerf: 0, elapsed: 0, finished: false,
     runs: [], closed: 0, closedTotal: 0, auto: null, autoOn: false,
-    viewTop: null, small: false, pre: null, lastManual: 0,
+    viewTop: null, prec: 3, pre: null, lastManual: 0,
   };
 
   /* ================= Format ================= */
@@ -55,11 +55,13 @@
     const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; s %= 60;
     return (h ? h + ':' + p2(m) : p2(m)) + ':' + p2(s) + '.' + String(frac).padStart(dec, '0');
   }
-  const dec = () => CFG.decimals === 'auto' ? (S.small ? 6 : 3) : +CFG.decimals;
+  const dec = () => CFG.decimals === 'auto' ? S.prec : +CFG.decimals;
+  const precFor = dt => dt < 1 ? 9 : dt < 1000 ? 6 : 3;
   const nf = new Intl.NumberFormat('de-DE'), nf6 = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 6 });
   const fmtN = n => nf.format(n);
   function fmtInterval(us) {
     if (!us) return 'Intervall ungültig';
+    if (us < 1) return nf6.format(Math.round(us * 1e3 * 1e3) / 1e3) + ' ns';
     if (us < 1e3) return nf6.format(us) + ' µs';
     if (us < 1e6) return nf6.format(us / 1e3) + ' ms';
     if (us < 6e7) return nf6.format(us / 1e6) + ' s';
@@ -138,7 +140,7 @@
     const dt = intervalUs();
     if (!S.autoOn || !dt) return;
     S.auto = { t0: anchor, dt, prev: S.closedTotal };
-    if (dt < 1000) S.small = true;
+    S.prec = Math.max(S.prec, precFor(dt));
   }
 
   function start() {
@@ -177,7 +179,7 @@
   }
   function reset() {
     S.pre = null; S.running = false; S.elapsed = 0; S.finished = false; S.runs = []; S.closed = 0; S.closedTotal = 0;
-    S.auto = null; S.viewTop = null; S.small = false; lastBeepCount = 0; S.lastManual = 0;
+    S.auto = null; S.viewTop = null; S.prec = 3; lastBeepCount = 0; S.lastManual = 0;
     wake(false); updateUI(); render(true); saveSession();
   }
   function lap() {
@@ -187,7 +189,7 @@
     S.lastManual = pn;
     const t = now();
     closeAuto(t);
-    if (t - S.closedTotal >= 0.5) {
+    if (t - S.closedTotal >= 5e-4) {
       S.runs.push({ i0: S.closed, t0: S.closedTotal, dt: t - S.closedTotal, n: 1, prev: S.closedTotal, man: true });
       S.closed++; S.closedTotal = t;
     }
@@ -238,7 +240,7 @@
     try {
       localStorage.setItem(SESSION_KEY, JSON.stringify({
         v: 3, wall: Date.now(), running: S.running, elapsed: now(), finished: S.finished,
-        runs: S.runs, closed: S.closed, closedTotal: S.closedTotal, auto: S.auto, autoOn: S.autoOn, small: S.small,
+        runs: S.runs, closed: S.closed, closedTotal: S.closedTotal, auto: S.auto, autoOn: S.autoOn, prec: S.prec,
       }));
     } catch (e) {}
   }
@@ -248,7 +250,7 @@
       const o = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
       if (!o || o.v !== 3) return;
       Object.assign(S, { runs: o.runs || [], closed: o.closed || 0, closedTotal: o.closedTotal || 0, auto: o.auto || null,
-        autoOn: !!o.autoOn, small: !!o.small, finished: !!o.finished, elapsed: o.elapsed || 0 });
+        autoOn: !!o.autoOn, prec: o.prec || 3, finished: !!o.finished, elapsed: o.elapsed || 0 });
       if (o.running) {
         S.elapsed += Math.max(0, Date.now() - o.wall) * 1000;
         S.running = true; S.startPerf = performance.now();

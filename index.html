@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#070a11">
-<meta name="description" content="Speed Clock – Online-Stoppuhr für blitzschnelle Runden, Auto-Runden bis 0,000001 s.">
+<meta name="description" content="Speed Clock – Online-Stoppuhr für blitzschnelle Runden, Auto-Runden bis 0,000000001 s.">
 <title>Speed Clock</title>
 <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="assets/logo.svg">
@@ -50,7 +50,7 @@
 
   <button class="card autotoggle" id="btnAuto" aria-pressed="false" title="Auto-Runden (A)">
     <span class="sw"></span>
-    <span><span class="t">Auto-Runden</span><small id="autoLbl">alle 1 µs</small></span>
+    <span><span class="t">Auto-Runden</span><small id="autoLbl">alle 1 ns</small></span>
     <span class="edit" id="autoEdit">Einstellen ›</span>
   </button>
 
@@ -106,15 +106,15 @@
     <section data-panel="laps">
       <div class="grp">
         <label for="cfgIntVal">Auto-Runden-Intervall</label>
-        <div class="help">Alle wie viel Zeit automatisch eine Runde ausgelöst wird (min. 1 µs = 0,000001 s).</div>
+        <div class="help">Alle wie viel Zeit automatisch eine Runde ausgelöst wird (min. 1 ns = 0,000000001 s → 1 Milliarde Runden pro Sekunde).</div>
         <div class="row">
           <input type="text" id="cfgIntVal" data-k="intVal" inputmode="decimal">
           <select id="cfgIntUnit" data-k="intUnit" style="width:110px">
-            <option value="us">µs</option><option value="ms">ms</option><option value="s">s</option><option value="min">min</option>
+            <option value="ns">ns</option><option value="us">µs</option><option value="ms">ms</option><option value="s">s</option><option value="min">min</option>
           </select>
         </div>
         <div class="presets" id="intPresets">
-          <button data-v="1" data-u="us">1 µs</button><button data-v="10" data-u="us">10 µs</button>
+          <button data-v="1" data-u="ns">1 ns ⚡</button><button data-v="10" data-u="ns">10 ns</button><button data-v="100" data-u="ns">100 ns</button><button data-v="1" data-u="us">1 µs</button>
           <button data-v="1" data-u="ms">1 ms</button><button data-v="100" data-u="ms">100 ms</button>
           <button data-v="1" data-u="s">1 s</button><button data-v="10" data-u="s">10 s</button><button data-v="1" data-u="min">1 min</button>
         </div>
@@ -178,7 +178,7 @@
       </div>
       <div class="grp">
         <span class="lbl">Nachkommastellen in Rundenliste</span>
-        <div class="seg" data-seg="decimals"><button data-v="auto">Auto</button><button data-v="2">0,01</button><button data-v="3">0,001</button><button data-v="6">0,000001</button></div>
+        <div class="seg" data-seg="decimals"><button data-v="auto">Auto</button><button data-v="2">0,01</button><button data-v="3">0,001</button><button data-v="6">µs</button><button data-v="9">ns</button></div>
       </div>
       <div class="grp">
         <span class="lbl">Zeilen in der Rundenliste</span>

@@ -6,7 +6,7 @@ Online-Stoppuhr für blitzschnelle Runden – läuft komplett im Browser und wir
 
 ## Funktionen
 - **Schnelle Runden:** Leertaste, großer „RUNDE“-Button oder auf die Zeitanzeige tippen
-- **Auto-Runden** bis hinunter auf **1 µs (0,000001 s)** – Milliarden Runden ohne Absturz, weil Runden berechnet statt einzeln gespeichert werden
+- **Auto-Runden** bis hinunter auf **1 ns (0,000000001 s) = 1 Milliarde Runden pro Sekunde** – Milliarden Runden ohne Absturz, weil Runden berechnet statt einzeln gespeichert werden
 - **Admin-Panel** (Regler-Symbol, Taste `S` oder `#admin` in der URL):
   - Runden: Intervall (µs/ms/s/min), Auto beim Start, Stopp nach N Runden, Doppel-Tipp-Sperre
   - Zeit: Dauer der Stoppuhr (stoppt exakt), Startverzögerung 3/5/10 s
