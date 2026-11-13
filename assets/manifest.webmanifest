@@ -1,0 +1,9 @@
+{
+  "name": "Speed Clock",
+  "short_name": "Speed Clock",
+  "start_url": "../index.html",
+  "display": "standalone",
+  "background_color": "#0b0f17",
+  "theme_color": "#0b0f17",
+  "icons": [{ "src": "logo.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

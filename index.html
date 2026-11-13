@@ -3,171 +3,67 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0b0f17">
+<meta name="theme-color" content="#070a11">
+<meta name="description" content="Speed Clock – Online-Stoppuhr für blitzschnelle Runden, Auto-Runden bis 0,000001 s.">
 <title>Speed Clock</title>
-<style>
-  :root {
-    --bg: #0b0f17; --panel: #141a26; --panel2: #1c2333; --text: #e8edf6; --muted: #8a95ab;
-    --accent: #3ddc97; --accent2: #4aa3ff; --danger: #ff5d6c; --warn: #ffb547; --border: #263047;
-  }
-  @media (prefers-color-scheme: light) {
-    :root { --bg: #f4f6fa; --panel: #fff; --panel2: #eef1f7; --text: #121826; --muted: #5b667d;
-      --accent: #12a66a; --accent2: #1f6fd1; --danger: #d92d3e; --warn: #e89400; --border: #d8deea; }
-  }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; background: var(--bg); color: var(--text);
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  body { min-height: 100dvh; display: flex; flex-direction: column; align-items: center;
-    padding: max(16px, env(safe-area-inset-top)) 16px 24px; -webkit-tap-highlight-color: transparent; }
-  main { width: 100%; max-width: 720px; display: flex; flex-direction: column; gap: 14px; }
-  h1 { font-size: 1.1rem; margin: 0; letter-spacing: .04em; }
-
-  .display { background: var(--panel); border: 1px solid var(--border); border-radius: 20px;
-    padding: 20px 16px; text-align: center; user-select: none; cursor: pointer; touch-action: manipulation; }
-  .time { font-variant-numeric: tabular-nums; font-weight: 700; font-size: clamp(2.6rem, 13vw, 6rem);
-    line-height: 1; letter-spacing: -.02em; }
-  .time small { font-size: .45em; color: var(--muted); font-weight: 600; }
-  .laps-big { margin-top: 12px; font-variant-numeric: tabular-nums; font-size: clamp(1.2rem, 5vw, 1.8rem); font-weight: 700; }
-  .laps-big span { color: var(--muted); font-weight: 500; font-size: .7em; }
-  .sub { margin-top: 8px; color: var(--muted); font-variant-numeric: tabular-nums; display: flex;
-    justify-content: center; gap: 16px; flex-wrap: wrap; font-size: .9rem; }
-  .sub b { color: var(--text); }
-  .progress { height: 6px; background: var(--panel2); border-radius: 3px; margin-top: 14px; overflow: hidden; }
-  .progress > i { display: block; height: 100%; width: 0; background: var(--accent2); }
-  .display.done .time { color: var(--danger); }
-  .flash { animation: flash .25s ease-out; }
-  @keyframes flash { from { box-shadow: 0 0 0 4px var(--accent); } to { box-shadow: 0 0 0 0 transparent; } }
-
-  .controls { display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 10px; }
-  button { font: inherit; touch-action: manipulation; cursor: pointer; }
-  .controls button { border: 0; border-radius: 16px; font-weight: 700; font-size: 1.1rem; padding: 18px 8px; color: #fff; }
-  .controls button:active { transform: scale(.97); }
-  .controls button:disabled { opacity: .35; cursor: default; transform: none; }
-  #btnStart { background: var(--accent); color: #062b1b; }
-  #btnStart.running { background: var(--danger); color: #fff; }
-  #btnLap { background: var(--accent2); font-size: 1.5rem; }
-  #btnReset { background: var(--panel2); color: var(--text); border: 1px solid var(--border); }
-
-  .auto { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: stretch;
-    background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 12px; }
-  #btnAuto { border: 2px solid var(--border); background: var(--panel2); color: var(--text); border-radius: 12px;
-    padding: 10px 16px; font-weight: 800; min-width: 130px; }
-  #btnAuto.on { background: var(--warn); border-color: var(--warn); color: #241500; }
-  .auto .cfg { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-  .row { display: flex; gap: 6px; align-items: center; }
-  .lbl { color: var(--muted); font-size: .85rem; }
-  input[type=text], input[type=number] { width: 100%; min-width: 0; background: var(--panel2); color: var(--text);
-    border: 1px solid var(--border); border-radius: 10px; padding: 9px 10px; font: inherit; font-variant-numeric: tabular-nums; }
-  input.bad { border-color: var(--danger); }
-  .presets { display: flex; gap: 6px; flex-wrap: wrap; }
-  .presets button, .tbtn { background: var(--panel2); border: 1px solid var(--border); color: var(--text); border-radius: 8px;
-    padding: 5px 10px; font-size: .82rem; }
-  .hint { text-align: center; color: var(--muted); font-size: .8rem; }
-  kbd { background: var(--panel2); border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; font-size: .75rem; }
-
-  details { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 4px 16px; }
-  summary { cursor: pointer; padding: 10px 0; font-weight: 600; }
-  .settings { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; padding: 6px 0 14px; }
-  .field { display: flex; flex-direction: column; gap: 6px; }
-  .check { display: flex; align-items: center; gap: 8px; }
-  .check input { width: 20px; height: 20px; accent-color: var(--accent); }
-
-  .laps { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
-  .laps-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;
-    padding: 12px 16px; border-bottom: 1px solid var(--border); }
-  .laps-head h2 { margin: 0; font-size: 1rem; }
-  .laps-head .act { display: flex; gap: 6px; flex-wrap: wrap; }
-  .nav { display: flex; gap: 6px; align-items: center; padding: 8px 16px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
-  .nav input { width: 150px; padding: 5px 8px; font-size: .85rem; }
-  .nav .pos { margin-left: auto; color: var(--muted); font-size: .8rem; font-variant-numeric: tabular-nums; }
-  .tbtn.live { background: var(--accent); color: #062b1b; border-color: var(--accent); }
-  .tablewrap { overscroll-behavior: contain; }
-  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
-  th, td { padding: 0 16px; height: 32px; text-align: right; white-space: nowrap; }
-  th { color: var(--muted); font-weight: 500; font-size: .8rem; }
-  th:first-child, td:first-child { text-align: left; }
-  tbody tr:nth-child(odd) { background: color-mix(in srgb, var(--panel2) 50%, transparent); }
-  tr.best td:nth-child(2) { color: var(--accent); font-weight: 700; }
-  tr.worst td:nth-child(2) { color: var(--danger); font-weight: 700; }
-  tr.man td:first-child::after { content: " ●"; color: var(--accent2); font-size: .7em; }
-  .empty { padding: 22px; text-align: center; color: var(--muted); }
-  .stats { display: grid; grid-template-columns: repeat(3, 1fr); text-align: center; border-top: 1px solid var(--border); }
-  .stats div { padding: 10px 4px; font-size: .78rem; color: var(--muted); }
-  .stats b { display: block; color: var(--text); font-size: .95rem; font-variant-numeric: tabular-nums; }
-  @media (max-width: 480px) {
-    th, td { padding: 0 8px; font-size: .85rem; } .controls button { padding: 16px 4px; }
-    .auto { grid-template-columns: 1fr; } #btnAuto { min-width: 0; }
-  }
-</style>
+<link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/logo.svg">
+<link rel="manifest" href="assets/manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
 <main>
-  <h1>⏱ SPEED CLOCK</h1>
+  <header class="top">
+    <a class="brand" href="./">
+      <img src="assets/logo.svg" alt="">
+      <div><div class="name">SPEED<span>CLOCK</span></div><small>Runden in Lichtgeschwindigkeit</small></div>
+    </a>
+    <button class="icon-btn" id="btnAdmin" aria-label="Admin-Panel öffnen" title="Admin-Panel (S)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg>
+    </button>
+  </header>
 
-  <section class="display" id="display" title="Tippen = Runde">
+  <section class="card hero" id="display" title="Tippen = Runde">
+    <div class="status"><span class="dot"></span><span id="stateTxt">Bereit</span><span class="chip" id="autoChip">AUTO AUS</span></div>
     <div class="time" id="time">00:00<small>.000</small></div>
-    <div class="laps-big"><span>Runden</span> <b id="lapCountBig">0</b></div>
-    <div class="sub">
-      <span>Aktuelle Runde <b id="lapTime">00:00.000</b></span>
-      <span id="rateInfo" hidden><b id="rate">0</b> Runden/s</span>
-      <span id="remInfo" hidden>Rest <b id="remain">–</b></span>
+    <div class="tiles">
+      <div class="big"><span>Runden</span><b id="lapCountBig">0</b></div>
+      <div><span>Diese Runde</span><b id="lapTime">00:00.000</b></div>
+      <div><span>Ø Runde</span><b id="avgTile">–</b></div>
     </div>
-    <div class="progress" id="progressWrap" hidden><i id="progress"></i></div>
+    <div id="progBox" hidden>
+      <div class="progress"><i id="progress"></i></div>
+      <div class="prog-lbl"><span>Rest <b id="remain">–</b></span><span id="limitLbl"></span></div>
+    </div>
   </section>
 
   <div class="controls">
-    <button id="btnReset">Reset</button>
-    <button id="btnLap" disabled>Runde</button>
-    <button id="btnStart">Start</button>
+    <button class="round" id="btnReset" aria-label="Reset" title="Reset (R)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+    </button>
+    <button class="lapbtn" id="btnLap" disabled title="Runde (Leertaste)">RUNDE</button>
+    <button class="round" id="btnStart" aria-label="Start" title="Start/Stopp (Enter)"></button>
   </div>
 
-  <section class="auto">
-    <button id="btnAuto" aria-pressed="false">AUTO-RUNDEN<br>AUS</button>
-    <div class="cfg">
-      <label class="lbl" for="autoInt">Alle … Sekunden eine Runde (min. 0,000001 s)</label>
-      <div class="row"><input type="text" id="autoInt" inputmode="decimal" value="0,000001"> s</div>
-      <div class="presets" id="autoPresets">
-        <button data-s="0.000001">0,000001 s</button><button data-s="0.001">0,001 s</button>
-        <button data-s="0.1">0,1 s</button><button data-s="1">1 s</button><button data-s="10">10 s</button>
-      </div>
-    </div>
-  </section>
+  <button class="card autotoggle" id="btnAuto" aria-pressed="false" title="Auto-Runden (A)">
+    <span class="sw"></span>
+    <span><span class="t">Auto-Runden</span><small id="autoLbl">alle 1 µs</small></span>
+    <span class="edit" id="autoEdit">Einstellen ›</span>
+  </button>
 
-  <div class="hint"><kbd>Leertaste</kbd> Runde · <kbd>Enter</kbd> Start/Stopp · <kbd>A</kbd> Auto an/aus · <kbd>R</kbd> Reset · Anzeige antippen = Runde</div>
-
-  <details open>
-    <summary>Dauer &amp; Optionen</summary>
-    <div class="settings">
-      <div class="field">
-        <span class="lbl">Dauer der Stoppuhr (0 = unbegrenzt) – stoppt automatisch</span>
-        <div class="row">
-          <input type="number" id="durH" min="0" max="999" value="0" aria-label="Stunden"> h
-          <input type="number" id="durM" min="0" max="59" value="0" aria-label="Minuten"> min
-          <input type="text" id="durS" inputmode="decimal" value="0" aria-label="Sekunden"> s
-        </div>
-        <div class="presets" id="durPresets">
-          <button data-s="0">∞</button><button data-s="10">10 s</button><button data-s="60">1 min</button>
-          <button data-s="300">5 min</button><button data-s="3600">1 h</button>
-        </div>
-      </div>
-      <div class="field" style="gap:10px">
-        <label class="check"><input type="checkbox" id="optBeep" checked> Ton (nur bei Runden ≥ 0,25 s)</label>
-        <label class="check"><input type="checkbox" id="optVibrate" checked> Vibration (Handy)</label>
-        <label class="check"><input type="checkbox" id="optWake" checked> Bildschirm wach halten</label>
-      </div>
-    </div>
-  </details>
-
-  <section class="laps">
+  <section class="card laps" id="lapsCard">
     <div class="laps-head">
-      <h2>Runden</h2>
-      <div class="act"><button class="tbtn" id="btnCopy">Kopieren</button><button class="tbtn" id="btnCsv">CSV</button></div>
+      <h2>RUNDEN</h2>
+      <div class="presets"><button class="tbtn" id="btnCopy">Kopieren</button><button class="tbtn" id="btnCsv">CSV</button></div>
     </div>
     <div class="nav">
       <button class="tbtn live" id="btnLive">● Live</button>
       <button class="tbtn" id="btnUp" title="Neuere">▲</button>
       <button class="tbtn" id="btnDown" title="Ältere">▼</button>
-      <input type="text" id="gotoLap" inputmode="numeric" placeholder="Gehe zu Runde #">
+      <input type="text" id="gotoLap" inputmode="numeric" placeholder="Gehe zu #">
       <span class="pos" id="pos"></span>
     </div>
     <div class="tablewrap" id="tablewrap">
@@ -175,7 +71,7 @@
         <thead><tr><th>#</th><th>Runde</th><th>Gesamt</th></tr></thead>
         <tbody id="lapBody"></tbody>
       </table>
-      <div class="empty" id="empty">Noch keine Runden – Start drücken, dann Leertaste / Tippen oder Auto-Runden.</div>
+      <div class="empty" id="empty">Noch keine Runden – Start drücken, dann Leertaste, Anzeige antippen oder Auto-Runden.</div>
     </div>
     <div class="stats">
       <div>Beste<b id="stBest">–</b></div>
@@ -183,355 +79,172 @@
       <div>Langsamste<b id="stWorst">–</b></div>
     </div>
   </section>
+
+  <div class="hint"><kbd>Leertaste</kbd> Runde · <kbd>Enter</kbd> Start/Stopp · <kbd>A</kbd> Auto · <kbd>R</kbd> Reset · <kbd>S</kbd> Admin</div>
 </main>
 
-<script>
-(() => {
-  'use strict';
-  const $ = id => document.getElementById(id);
-  const ROWS = 20;
-  const MIN_INT_US = 1;                 // 0,000001 s
-  const CSV_MAX = 1000000, COPY_MAX = 100000;
-  const KEY = 'speedclock.settings.v2';
+<!-- ============ ADMIN PANEL ============ -->
+<div class="scrim" id="scrim"></div>
+<aside class="admin" id="admin" aria-label="Admin-Panel" aria-hidden="true">
+  <div class="admin-head">
+    <img src="assets/logo.svg" alt="">
+    <h2>Admin-Panel<small>Änderungen gelten sofort</small></h2>
+    <button class="icon-btn" id="btnAdminClose" aria-label="Schließen">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+    </button>
+  </div>
+  <nav class="admin-tabs" id="adminTabs">
+    <button data-tab="laps" class="on">Runden</button>
+    <button data-tab="time">Zeit</button>
+    <button data-tab="look">Anzeige</button>
+    <button data-tab="fx">Feedback</button>
+    <button data-tab="data">Daten</button>
+    <button data-tab="lock">Sicherheit</button>
+  </nav>
+  <div class="admin-body">
 
-  /*
-   * Alle Zeiten in Mikrosekunden (µs). Runden werden NICHT einzeln gespeichert,
-   * sondern als "Läufe": {i0, t0, dt, n, prev, man}. Runde k eines Laufs endet bei
-   * t0 + (k+1)*dt; die erste Runde ist (Ende - prev) lang. So kosten auch
-   * Milliarden Auto-Runden nur ein paar Bytes – nichts kann abstürzen.
-   */
-  const S = {
-    running: false, startPerf: 0, elapsed: 0, finished: false,
-    runs: [], closed: 0, closedTotal: 0,
-    auto: null,          // offener Auto-Lauf {t0, dt, prev}
-    autoOn: false,
-    viewTop: null,       // null = live (neueste oben), sonst Index der obersten Zeile
-    small: false,        // µs-Anzeige nötig?
-  };
+    <section data-panel="laps">
+      <div class="grp">
+        <label for="cfgIntVal">Auto-Runden-Intervall</label>
+        <div class="help">Alle wie viel Zeit automatisch eine Runde ausgelöst wird (min. 1 µs = 0,000001 s).</div>
+        <div class="row">
+          <input type="text" id="cfgIntVal" data-k="intVal" inputmode="decimal">
+          <select id="cfgIntUnit" data-k="intUnit" style="width:110px">
+            <option value="us">µs</option><option value="ms">ms</option><option value="s">s</option><option value="min">min</option>
+          </select>
+        </div>
+        <div class="presets" id="intPresets">
+          <button data-v="1" data-u="us">1 µs</button><button data-v="10" data-u="us">10 µs</button>
+          <button data-v="1" data-u="ms">1 ms</button><button data-v="100" data-u="ms">100 ms</button>
+          <button data-v="1" data-u="s">1 s</button><button data-v="10" data-u="s">10 s</button><button data-v="1" data-u="min">1 min</button>
+        </div>
+      </div>
+      <label class="toggle">Auto-Runden beim Start automatisch einschalten <input type="checkbox" data-k="autoOnStart"></label>
+      <div class="grp">
+        <label for="cfgMaxLaps">Stopp nach … Runden</label>
+        <div class="help">0 = unbegrenzt. Stoppt exakt bei der eingestellten Runde.</div>
+        <input type="number" id="cfgMaxLaps" data-k="maxLaps" min="0" step="1">
+        <div class="presets" id="maxPresets">
+          <button data-v="0">∞</button><button data-v="10">10</button><button data-v="100">100</button>
+          <button data-v="1000000">1 Mio.</button><button data-v="1000000000">1 Mrd.</button>
+        </div>
+      </div>
+      <div class="grp">
+        <span class="lbl">Manuelle Runden-Sperre</span>
+        <div class="help">Verhindert versehentliche Doppel-Runden (Mindestabstand zwischen zwei Tipps).</div>
+        <div class="seg" data-seg="debounce">
+          <button data-v="0">Aus</button><button data-v="100">0,1 s</button><button data-v="300">0,3 s</button><button data-v="1000">1 s</button>
+        </div>
+      </div>
+    </section>
 
-  // ---------- Format ----------
-  const p2 = n => String(n).padStart(2, '0');
-  function fmt(us, dec, floor) {
-    const unit = 10 ** (6 - dec);
-    let v = floor ? Math.floor(us / unit + 1e-7) : Math.round(us / unit);
-    if (!isFinite(v) || v < 0) v = 0;
-    const scale = 10 ** dec;
-    const frac = v % scale; let s = Math.floor(v / scale);
-    const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; s %= 60;
-    return (h ? h + ':' + p2(m) : p2(m)) + ':' + p2(s) + '.' + String(frac).padStart(dec, '0');
-  }
-  const dec = () => S.small ? 6 : 3;
-  const nf = new Intl.NumberFormat('de-DE');
-  const fmtN = n => nf.format(n);
+    <section data-panel="time" hidden>
+      <div class="grp">
+        <span class="lbl">Dauer der Stoppuhr</span>
+        <div class="help">0 = unbegrenzt. Die Uhr stoppt automatisch exakt bei dieser Zeit.</div>
+        <div class="row">
+          <input type="number" data-k="durH" min="0" aria-label="Stunden"><span>h</span>
+          <input type="number" data-k="durM" min="0" max="59" aria-label="Minuten"><span>min</span>
+          <input type="text" data-k="durS" inputmode="decimal" aria-label="Sekunden"><span>s</span>
+        </div>
+        <div class="presets" id="durPresets">
+          <button data-s="0">∞</button><button data-s="10">10 s</button><button data-s="30">30 s</button><button data-s="60">1 min</button>
+          <button data-s="300">5 min</button><button data-s="1800">30 min</button><button data-s="3600">1 h</button>
+        </div>
+      </div>
+      <div class="grp">
+        <span class="lbl">Startverzögerung</span>
+        <div class="help">Countdown mit Ton vor dem eigentlichen Start.</div>
+        <div class="seg" data-seg="delay">
+          <button data-v="0">Aus</button><button data-v="3">3 s</button><button data-v="5">5 s</button><button data-v="10">10 s</button>
+        </div>
+      </div>
+    </section>
 
-  // ---------- Einstellungen ----------
-  const parseNum = str => { const v = parseFloat(String(str).trim().replace(',', '.')); return isFinite(v) && v >= 0 ? v : NaN; };
-  function intervalUs() {
-    const v = parseNum($('autoInt').value);
-    const ok = isFinite(v) && v > 0;
-    $('autoInt').classList.toggle('bad', !ok);
-    return ok ? Math.max(MIN_INT_US, v * 1e6) : 0;
-  }
-  function durationUs() {
-    const h = parseNum($('durH').value) || 0, m = parseNum($('durM').value) || 0, s = parseNum($('durS').value) || 0;
-    return Math.min((h * 3600 + m * 60 + s) * 1e6, 1e15);
-  }
-  function save() {
-    try {
-      localStorage.setItem(KEY, JSON.stringify({
-        autoInt: $('autoInt').value, durH: $('durH').value, durM: $('durM').value, durS: $('durS').value,
-        beep: $('optBeep').checked, vib: $('optVibrate').checked, wake: $('optWake').checked,
-      }));
-    } catch (e) {}
-  }
-  function load() {
-    try {
-      const o = JSON.parse(localStorage.getItem(KEY) || 'null'); if (!o) return;
-      ['autoInt', 'durH', 'durM', 'durS'].forEach(k => { if (o[k] != null) $(k).value = o[k]; });
-      $('optBeep').checked = o.beep !== false; $('optVibrate').checked = o.vib !== false; $('optWake').checked = o.wake !== false;
-    } catch (e) {}
-  }
+    <section data-panel="look" hidden>
+      <div class="grp">
+        <span class="lbl">Design</span>
+        <div class="seg" data-seg="theme"><button data-v="auto">Auto</button><button data-v="dark">Dunkel</button><button data-v="light">Hell</button></div>
+      </div>
+      <div class="grp">
+        <span class="lbl">Akzentfarbe</span>
+        <div class="swatches" id="swatches">
+          <button data-v="#3ddc97" style="--c:#3ddc97" aria-label="Grün"></button>
+          <button data-v="#4aa3ff" style="--c:#4aa3ff" aria-label="Blau"></button>
+          <button data-v="#b18cff" style="--c:#b18cff" aria-label="Lila"></button>
+          <button data-v="#ffb547" style="--c:#ffb547" aria-label="Orange"></button>
+          <button data-v="#ff6b9a" style="--c:#ff6b9a" aria-label="Pink"></button>
+        </div>
+      </div>
+      <div class="grp">
+        <span class="lbl">Nachkommastellen in Rundenliste</span>
+        <div class="seg" data-seg="decimals"><button data-v="auto">Auto</button><button data-v="2">0,01</button><button data-v="3">0,001</button><button data-v="6">0,000001</button></div>
+      </div>
+      <div class="grp">
+        <span class="lbl">Zeilen in der Rundenliste</span>
+        <div class="seg" data-seg="rows"><button data-v="10">10</button><button data-v="20">20</button><button data-v="50">50</button></div>
+      </div>
+      <label class="toggle">Rundenliste anzeigen <input type="checkbox" data-k="showList"></label>
+      <label class="toggle">Tastatur-Hinweise anzeigen <input type="checkbox" data-k="showHints"></label>
+    </section>
 
-  // ---------- Feedback ----------
-  let audio;
-  function beep(freq = 880, dur = 0.08, times = 1) {
-    if (!$('optBeep').checked) return;
-    try {
-      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
-      for (let i = 0; i < times; i++) {
-        const t = audio.currentTime + i * (dur + 0.07);
-        const o = audio.createOscillator(), g = audio.createGain();
-        o.frequency.value = freq; o.connect(g); g.connect(audio.destination);
-        g.gain.setValueAtTime(0.25, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-        o.start(t); o.stop(t + dur);
-      }
-    } catch (e) {}
-  }
-  const vibrate = p => { try { if ($('optVibrate').checked && navigator.vibrate) navigator.vibrate(p); } catch (e) {} };
-  function flash() { const d = $('display'); d.classList.remove('flash'); void d.offsetWidth; d.classList.add('flash'); }
-  let wakeLock = null;
-  async function wake(on) {
-    try {
-      if (on && $('optWake').checked && 'wakeLock' in navigator && !wakeLock) {
-        wakeLock = await navigator.wakeLock.request('screen');
-        wakeLock.addEventListener('release', () => wakeLock = null);
-      } else if (!on && wakeLock) { await wakeLock.release(); wakeLock = null; }
-    } catch (e) {}
-  }
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && S.running) { wake(true); tick(); }
-  });
+    <section data-panel="fx" hidden>
+      <label class="toggle">Ton <input type="checkbox" data-k="beep"></label>
+      <div class="grp">
+        <label for="cfgVol">Lautstärke</label>
+        <input type="range" id="cfgVol" data-k="volume" min="0" max="1" step="0.05">
+        <div class="help">Bei Auto-Runden unter 0,25 s wird nicht gepiept.</div>
+      </div>
+      <label class="toggle">Vibration (Handy) <input type="checkbox" data-k="vibrate"></label>
+      <label class="toggle">Bildschirm wach halten <input type="checkbox" data-k="wake"></label>
+      <button class="btn" id="btnTestBeep">Ton testen</button>
+    </section>
 
-  // ---------- Kern ----------
-  function now() {
-    const raw = S.running ? S.elapsed + (performance.now() - S.startPerf) * 1000 : S.elapsed;
-    const d = durationUs();
-    return d > 0 ? Math.min(raw, d) : raw;
-  }
-  const openCount = t => S.auto ? Math.max(0, Math.floor((t - S.auto.t0) / S.auto.dt + 1e-9)) : 0;
-  const lapCount = t => S.closed + openCount(t);
-  const lastTotal = t => { const n = openCount(t); return n ? S.auto.t0 + n * S.auto.dt : S.closedTotal; };
+    <section data-panel="data" hidden>
+      <div class="kv" id="infoKv">
+        <span>Runden</span><b id="iLaps">0</b>
+        <span>Laufzeit</span><b id="iTime">–</b>
+        <span>Gespeicherte Abschnitte</span><b id="iRuns">0</b>
+        <span>Speicher (JS)</span><b id="iMem">–</b>
+      </div>
+      <div class="grp">
+        <span class="lbl">CSV-Export: max. Zeilen</span>
+        <div class="seg" data-seg="csvMax"><button data-v="10000">10.000</button><button data-v="100000">100.000</button><button data-v="1000000">1 Mio.</button></div>
+        <div class="help">Große Exporte laufen in Etappen, damit die Seite nicht einfriert.</div>
+      </div>
+      <div class="row"><button class="btn primary" id="btnCsv2" style="flex:1">CSV exportieren</button><button class="btn" id="btnCopy2" style="flex:1">Kopieren</button></div>
+      <label class="toggle">Sitzung sichern &amp; nach Neuladen fortsetzen <input type="checkbox" data-k="restore"></label>
+      <div class="row">
+        <button class="btn" id="btnExportCfg" style="flex:1">Einstellungen exportieren</button>
+        <button class="btn" id="btnImportCfg" style="flex:1">Importieren</button>
+        <input type="file" id="fileCfg" accept="application/json,.json" hidden>
+      </div>
+      <button class="btn danger" id="btnResetCfg">Alle Einstellungen zurücksetzen</button>
+    </section>
 
-  function closeAuto(t) {
-    if (!S.auto) return;
-    const n = openCount(t);
-    if (n > 0) {
-      S.runs.push({ i0: S.closed, t0: S.auto.t0, dt: S.auto.dt, n, prev: S.auto.prev, man: false });
-      S.closed += n; S.closedTotal = S.auto.t0 + n * S.auto.dt;
-    }
-    S.auto = null;
-  }
-  function openAuto(anchor) {
-    const dt = intervalUs();
-    if (!S.autoOn || !dt) return;
-    S.auto = { t0: anchor, dt, prev: S.closedTotal };
-    if (dt < 1000) S.small = true;
-  }
+    <section data-panel="lock" hidden>
+      <div class="grp">
+        <label for="pinNew">Admin-PIN</label>
+        <div class="help" id="pinState">Kein PIN gesetzt – das Panel ist frei zugänglich.</div>
+        <input type="password" id="pinNew" inputmode="numeric" placeholder="Neuer PIN (4–8 Ziffern)" maxlength="8" autocomplete="new-password">
+        <div class="row"><button class="btn primary" id="btnPinSet" style="flex:1">PIN setzen</button><button class="btn danger" id="btnPinDel" style="flex:1">PIN entfernen</button></div>
+      </div>
+      <p class="note">Der PIN schützt das Admin-Panel auf diesem Gerät vor versehentlichen Änderungen. Er wird nur lokal im Browser gespeichert (gehasht) – kein Ersatz für echte Zugangskontrolle.</p>
+    </section>
+  </div>
+</aside>
 
-  function start() {
-    if (S.finished) reset();
-    const d = durationUs();
-    if (d > 0 && S.elapsed >= d) return;
-    S.running = true; S.startPerf = performance.now();
-    if (S.autoOn && !S.auto) openAuto(S.elapsed);
-    beep(1200, 0.05); wake(true); updateButtons(); tick();
-  }
-  function stop() {
-    S.elapsed = now(); S.running = false; wake(false); updateButtons(); render(true);
-  }
-  function reset() {
-    S.running = false; S.elapsed = 0; S.finished = false; S.runs = []; S.closed = 0; S.closedTotal = 0;
-    S.auto = null; S.viewTop = null; S.small = false; lastBeepCount = 0;
-    $('display').classList.remove('done'); wake(false); updateButtons(); render(true);
-  }
-  function lap() {
-    if (!S.running) return;
-    const t = now();
-    closeAuto(t);
-    if (t - S.closedTotal >= 0.5) {
-      S.runs.push({ i0: S.closed, t0: S.closedTotal, dt: t - S.closedTotal, n: 1, prev: S.closedTotal, man: true });
-      S.closed++; S.closedTotal = t;
-    }
-    openAuto(t);
-    beep(880); vibrate(30); flash(); render(true);
-  }
-  function setAuto(on) {
-    S.autoOn = on;
-    const b = $('btnAuto');
-    b.classList.toggle('on', on); b.setAttribute('aria-pressed', on);
-    b.innerHTML = 'AUTO-RUNDEN<br>' + (on ? 'AN' : 'AUS');
-    const t = now();
-    if (on) { if (!S.auto && (S.running || S.elapsed > 0)) openAuto(t); }
-    else closeAuto(t);
-    render(true);
-  }
-  function finish() {
-    S.elapsed = durationUs(); S.running = false; S.finished = true;
-    $('display').classList.add('done'); beep(520, 0.25, 3); vibrate([200, 100, 200, 100, 400]);
-    wake(false); updateButtons(); render(true);
-  }
+<div class="modal" id="pinModal" hidden>
+  <div class="box">
+    <img src="assets/logo.svg" alt="">
+    <b>Admin-PIN eingeben</b>
+    <input type="password" id="pinIn" inputmode="numeric" maxlength="8" autocomplete="off">
+    <div class="err" id="pinErr"></div>
+    <div class="row"><button class="btn" id="pinCancel" style="flex:1">Abbrechen</button><button class="btn primary" id="pinOk" style="flex:1">Öffnen</button></div>
+  </div>
+</div>
 
-  // Runde i (0-basiert) berechnen
-  function getLap(i) {
-    let r, k;
-    if (i >= S.closed) { r = S.auto; k = i - S.closed; }
-    else {
-      let lo = 0, hi = S.runs.length - 1;
-      while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (S.runs[mid].i0 <= i) lo = mid; else hi = mid - 1; }
-      r = S.runs[lo]; k = i - r.i0;
-    }
-    const total = r.t0 + (k + 1) * r.dt;
-    return { total, lap: k === 0 ? total - r.prev : r.dt, man: !!r.man };
-  }
-  function stats(t) {
-    const n = lapCount(t); if (!n) return null;
-    let best = Infinity, worst = 0;
-    const add = (r, cnt) => {
-      const first = r.t0 + r.dt - r.prev;
-      best = Math.min(best, first); worst = Math.max(worst, first);
-      if (cnt > 1) { best = Math.min(best, r.dt); worst = Math.max(worst, r.dt); }
-    };
-    S.runs.forEach(r => add(r, r.n));
-    if (S.auto && openCount(t)) add(S.auto, openCount(t));
-    return { n, best, worst, avg: lastTotal(t) / n };
-  }
-
-  // ---------- Darstellung ----------
-  let lastTable = 0, lastBeepCount = 0;
-  function tick() {
-    if (!S.running) return;
-    const d = durationUs();
-    if (d > 0 && S.elapsed + (performance.now() - S.startPerf) * 1000 >= d) { finish(); return; }
-    const c = lapCount(now());
-    if (S.auto && S.auto.dt >= 250000 && c > lastBeepCount) { beep(660); vibrate(20); flash(); }
-    lastBeepCount = c;
-    render(false);
-    if (!document.hidden) requestAnimationFrame(tick);
-  }
-  setInterval(() => { if (S.running && document.hidden) tick(); }, 250);
-
-  function render(force) {
-    const t = now(), n = lapCount(t), d = durationUs();
-    const f = fmt(t, 3, true), i = f.lastIndexOf('.');
-    $('time').innerHTML = f.slice(0, i) + '<small>' + f.slice(i) + '</small>';
-    $('lapCountBig').textContent = fmtN(n);
-    $('lapTime').textContent = fmt(t - lastTotal(t), dec(), true);
-    $('rateInfo').hidden = !S.auto;
-    if (S.auto) $('rate').textContent = fmtN(Math.round(1e6 / S.auto.dt * 1000) / 1000);
-    $('remInfo').hidden = !(d > 0); $('progressWrap').hidden = !(d > 0);
-    if (d > 0) { $('remain').textContent = fmt(d - t, 3, false); $('progress').style.width = Math.min(100, t / d * 100) + '%'; }
-    const ms = performance.now();
-    if (force || ms - lastTable > 100) { lastTable = ms; renderTable(t, n); }
-  }
-
-  function renderTable(t, n) {
-    $('empty').hidden = n > 0;
-    let top = S.viewTop == null ? n - 1 : Math.min(S.viewTop, n - 1);
-    top = Math.max(top, Math.min(ROWS - 1, n - 1));
-    if (S.viewTop != null) S.viewTop = top;
-    $('btnLive').classList.toggle('live', S.viewTop == null);
-    const st = stats(t), D = dec();
-    const mark = st && st.best !== st.worst;
-    let html = '';
-    for (let i = top; i > top - ROWS && i >= 0; i--) {
-      const l = getLap(i);
-      const cls = (mark && l.lap === st.best ? 'best ' : '') + (mark && l.lap === st.worst ? 'worst ' : '') + (l.man ? 'man' : '');
-      html += `<tr class="${cls}"><td>${fmtN(i + 1)}</td><td>${fmt(l.lap, D)}</td><td>${fmt(l.total, D)}</td></tr>`;
-    }
-    $('lapBody').innerHTML = html;
-    $('pos').textContent = n ? `#${fmtN(Math.max(1, top - ROWS + 2))}–${fmtN(top + 1)} von ${fmtN(n)}` : '';
-    if (st) {
-      $('stBest').textContent = fmt(st.best, D); $('stWorst').textContent = fmt(st.worst, D); $('stAvg').textContent = fmt(st.avg, D);
-    } else ['stBest', 'stAvg', 'stWorst'].forEach(k => $(k).textContent = '–');
-  }
-
-  function scrollBy(rows) { // positiv = ältere
-    const n = lapCount(now()); if (!n) return;
-    const cur = S.viewTop == null ? n - 1 : S.viewTop;
-    const nt = cur - rows;
-    S.viewTop = nt >= n - 1 ? null : Math.max(Math.min(ROWS - 1, n - 1), nt);
-    render(true);
-  }
-
-  function updateButtons() {
-    const b = $('btnStart');
-    b.textContent = S.running ? 'Stopp' : (S.elapsed > 0 && !S.finished ? 'Weiter' : 'Start');
-    b.classList.toggle('running', S.running);
-    $('btnLap').disabled = !S.running;
-  }
-
-  // ---------- Export (gedeckelt, damit nichts abstürzt) ----------
-  function buildText(max, sep) {
-    const t = now(), n = lapCount(t), m = Math.min(n, max), D = dec();
-    const parts = ['Runde' + sep + 'Rundenzeit' + sep + 'Gesamt' + sep + 'Manuell\n'];
-    let chunk = [];
-    for (let i = 0; i < m; i++) {
-      const l = getLap(i);
-      chunk.push((i + 1) + sep + fmt(l.lap, D) + sep + fmt(l.total, D) + sep + (l.man ? 'ja' : ''));
-      if (chunk.length === 10000) { parts.push(chunk.join('\n') + '\n'); chunk = []; }
-    }
-    if (chunk.length) parts.push(chunk.join('\n') + '\n');
-    return { parts, n, m };
-  }
-  $('btnCsv').onclick = () => {
-    if (!lapCount(now())) return;
-    const { parts, n, m } = buildText(CSV_MAX, ';');
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob(parts, { type: 'text/csv' }));
-    a.download = 'runden-' + new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-') + '.csv';
-    a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-    if (n > m) alert(`Exportiert wurden die ersten ${fmtN(m)} von ${fmtN(n)} Runden.`);
-  };
-  $('btnCopy').onclick = async () => {
-    if (!lapCount(now())) return;
-    const { parts, n, m } = buildText(COPY_MAX, '\t');
-    try { await navigator.clipboard.writeText(parts.join('')); $('btnCopy').textContent = n > m ? `${fmtN(m)} kopiert` : 'Kopiert ✓'; }
-    catch (e) { $('btnCopy').textContent = 'Fehler'; }
-    setTimeout(() => $('btnCopy').textContent = 'Kopieren', 2000);
-  };
-
-  // ---------- Eingaben ----------
-  $('btnStart').onclick = () => S.running ? stop() : start();
-  $('btnLap').onclick = lap;
-  $('btnReset').onclick = reset;
-  $('btnAuto').onclick = () => setAuto(!S.autoOn);
-  $('display').addEventListener('pointerdown', e => { e.preventDefault(); S.running ? lap() : start(); });
-  $('btnLive').onclick = () => { S.viewTop = null; render(true); };
-  $('btnUp').onclick = () => scrollBy(-ROWS);
-  $('btnDown').onclick = () => scrollBy(ROWS);
-  $('tablewrap').addEventListener('wheel', e => {
-    if (!lapCount(now())) return;
-    e.preventDefault(); scrollBy(Math.sign(e.deltaY) * 3);
-  }, { passive: false });
-  let touchY = null;
-  $('tablewrap').addEventListener('touchstart', e => { touchY = e.touches[0].clientY; }, { passive: true });
-  $('tablewrap').addEventListener('touchmove', e => {
-    if (touchY == null || !lapCount(now())) return;
-    e.preventDefault();
-    const dy = touchY - e.touches[0].clientY, rows = Math.trunc(dy / 32);
-    if (rows) { scrollBy(rows); touchY -= rows * 32; }
-  }, { passive: false });
-  $('gotoLap').addEventListener('keydown', e => {
-    if (e.key !== 'Enter') return;
-    const v = parseInt(e.target.value.replace(/\D/g, ''), 10), n = lapCount(now());
-    if (v >= 1 && n) { const top = Math.min(v - 1 + Math.floor(ROWS / 2), n - 1); S.viewTop = top >= n - 1 ? null : top; render(true); }
-  });
-
-  document.addEventListener('keydown', e => {
-    if (e.target.tagName === 'INPUT') { if (e.key === 'Enter') e.target.blur(); return; }
-    if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
-    if (e.code === 'Space' || e.key === 'l' || e.key === 'L') { e.preventDefault(); S.running ? lap() : start(); }
-    else if (e.key === 'Enter') { e.preventDefault(); S.running ? stop() : start(); }
-    else if (e.key === 'a' || e.key === 'A') setAuto(!S.autoOn);
-    else if (e.key === 'r' || e.key === 'R') reset();
-  });
-
-  function setDurSeconds(s) { $('durH').value = Math.floor(s / 3600); $('durM').value = Math.floor(s / 60) % 60; $('durS').value = s % 60; onDur(); }
-  $('durPresets').addEventListener('click', e => { const s = e.target.dataset.s; if (s != null) setDurSeconds(+s); });
-  $('autoPresets').addEventListener('click', e => {
-    const s = e.target.dataset.s; if (s == null) return;
-    $('autoInt').value = s.replace('.', ','); onInterval();
-    if (!S.autoOn) setAuto(true);
-  });
-
-  function onInterval() {
-    intervalUs(); save();
-    if (S.auto) { closeAuto(now()); openAuto(S.closedTotal); }
-    render(true);
-  }
-  function onDur() {
-    save();
-    const d = durationUs();
-    if (S.finished && (d === 0 || d > S.elapsed)) { S.finished = false; $('display').classList.remove('done'); updateButtons(); }
-    if (S.running && d > 0 && S.elapsed + (performance.now() - S.startPerf) * 1000 >= d) finish();
-    render(true);
-  }
-  $('autoInt').addEventListener('input', onInterval);
-  ['durH', 'durM', 'durS'].forEach(k => $(k).addEventListener('input', onDur));
-  ['optBeep', 'optVibrate', 'optWake'].forEach(k => $(k).addEventListener('change', save));
-
-  load(); intervalUs(); updateButtons(); render(true);
-})();
-</script>
+<div class="toast" id="toast"></div>
+<script src="assets/app.js"></script>
 </body>
 </html>
