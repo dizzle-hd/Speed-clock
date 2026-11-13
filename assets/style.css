@@ -66,7 +66,11 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
   line-height: 1.05; letter-spacing: -.04em; margin: 12px 0 14px; text-shadow: 0 0 40px var(--glow); }
 .time small { font-size: .42em; color: var(--muted); font-weight: 600; letter-spacing: -.02em; }
 .finished .time { color: var(--danger); text-shadow: none; }
-.tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.counter { margin: -4px 0 14px; }
+.counter span { display: block; color: var(--muted); font-size: .72rem; text-transform: uppercase; letter-spacing: .12em; }
+.counter b { display: block; font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--accent); font-weight: 700;
+  font-size: clamp(1.25rem, 5.6vw, 2.3rem); line-height: 1.15; word-break: break-all; text-shadow: 0 0 24px var(--glow); }
+.tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
 .tiles div { background: var(--panel2); border-radius: 14px; padding: 10px 6px; min-width: 0; }
 .tiles span { display: block; color: var(--muted); font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; }
 .tiles b { display: block; font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: clamp(.9rem, 3.6vw, 1.25rem);
@@ -92,7 +96,8 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 .lapbtn:disabled { opacity: .35; box-shadow: none; transform: none; cursor: default; }
 
 /* Auto toggle */
-.autotoggle { display: flex; align-items: center; gap: 14px; width: 100%; padding: 14px 18px; border-radius: 18px; text-align: left; }
+.autobox { overflow: hidden; }
+.autotoggle { border: 0; background: none; display: flex; align-items: center; gap: 14px; width: 100%; padding: 14px 18px; border-radius: 18px; text-align: left; }
 .autotoggle .sw { width: 50px; height: 28px; border-radius: 999px; background: var(--panel2); position: relative; flex: none; transition: background .2s; border: 1px solid var(--border); }
 .autotoggle .sw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--muted); transition: transform .2s, background .2s; }
 .autotoggle.on .sw { background: var(--warn); }
@@ -202,3 +207,19 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
   .tiles span { font-size: .62rem; letter-spacing: .04em; }
 }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+/* Tempo-Chips */
+.speed { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; padding: 0 12px 12px; }
+.speed button { background: var(--panel2); border: 1px solid var(--border); border-radius: 12px; padding: 8px 4px; font-family: var(--mono);
+  font-weight: 700; font-size: .9rem; line-height: 1.2; }
+.speed button small { display: block; font-weight: 500; font-size: .66rem; color: var(--muted); font-family: var(--sans); }
+.speed button:hover { border-color: var(--accent); }
+.speed button.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.speed button.on small { color: inherit; opacity: .8; }
+.speed button.max:not(.on) { border-color: color-mix(in srgb, var(--warn) 60%, transparent); }
+.tiles b { white-space: normal; word-break: break-all; line-height: 1.2; }
+td { white-space: normal; word-break: break-all; height: auto; padding-top: 7px; padding-bottom: 7px; }
+@media (max-width: 480px) { .speed button { font-size: .78rem; padding: 7px 2px; } .speed button small { font-size: .58rem; } }
+.stats div { min-width: 0; }
+.stats b { word-break: break-all; white-space: normal; }
+@media (max-width: 480px) { .stats b { font-size: .78rem; } table { font-size: .74rem; } }

@@ -2,71 +2,98 @@
   'use strict';
   const $ = id => document.getElementById(id);
   const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
+  const B = BigInt;
+
+  /* ================= Einheiten =================
+   * Alle Zeiten sind exakte Ganzzahlen (BigInt) in Attosekunden (1 as = 10^-18 s).
+   * Dadurch sind Auto-Runden bis 1 as möglich = 1 Trillion (10^18) Runden pro Sekunde,
+   * ohne Rundungsfehler und ohne Obergrenze bei der Rundenzahl.
+   */
+  const UNIT = { as: 1n, fs: 10n ** 3n, ps: 10n ** 6n, ns: 10n ** 9n, us: 10n ** 12n, ms: 10n ** 15n, s: 10n ** 18n, min: 60n * 10n ** 18n };
+  const SEC = UNIT.s, MS = UNIT.ms;
+  const UNIT_LABEL = [['min', 'min'], ['s', 's'], ['ms', 'ms'], ['us', 'µs'], ['ns', 'ns'], ['ps', 'ps'], ['fs', 'fs'], ['as', 'as']];
+  const perfToAs = ms => B(Math.round(ms * 1e6)) * UNIT.ns;   // performance.now()-ms → as
+  const bmin = (a, b) => (a < b ? a : b), bmax = (a, b) => (a > b ? a : b);
 
   /* ================= Einstellungen ================= */
-  const CFG_KEY = 'speedclock.cfg.v3', SESSION_KEY = 'speedclock.session.v3';
+  const CFG_KEY = 'speedclock.cfg.v4', OLD_CFG_KEY = 'speedclock.cfg.v3', SESSION_KEY = 'speedclock.session.v4';
   const DEFAULTS = {
-    intVal: '1', intUnit: 'ns', autoOnStart: false, maxLaps: 0, debounce: '0',
-    durH: 0, durM: 0, durS: '0', delay: '0',
+    intVal: '1', intUnit: 'as', autoOnStart: false, maxLaps: '0', debounce: '0',
+    durH: '0', durM: '0', durS: '0', delay: '0',
     theme: 'auto', accent: '#3ddc97', decimals: 'auto', rows: '20', showList: true, showHints: true,
     beep: true, volume: 0.5, vibrate: true, wake: true,
     csvMax: '100000', restore: true, pinHash: '',
   };
   let CFG = { ...DEFAULTS };
-  const UNIT_US = { ns: 1e-3, us: 1, ms: 1e3, s: 1e6, min: 6e7 };
-  const MIN_INT_US = 1e-3; // 1 ns = 1 Milliarde Runden/s
   const COPY_MAX = 10000;
 
-  const parseNum = v => { const n = parseFloat(String(v).trim().replace(',', '.')); return isFinite(n) && n >= 0 ? n : NaN; };
-  function intervalUs() {
-    const v = parseNum(CFG.intVal);
-    if (!(v > 0)) return 0;
-    return Math.max(MIN_INT_US, v * (UNIT_US[CFG.intUnit] || 1));
+  // Dezimalzahl (Komma oder Punkt) exakt in BigInt umrechnen
+  function decTo(str, unit) {
+    const s = String(str ?? '').trim().replace(',', '.');
+    if (!/^\d*\.?\d*$/.test(s) || s === '' || s === '.') return null;
+    const [i, f = ''] = s.split('.');
+    const fr = f.slice(0, 30);
+    let v = B(i || '0') * unit + (fr ? B(fr) * unit / 10n ** B(fr.length) : 0n);
+    if (v === 0n && /[1-9]/.test(s)) v = 1n;   // kleiner als 1 as → 1 as
+    return v;
   }
-  function durationUs() {
-    const s = (parseNum(CFG.durH) || 0) * 3600 + (parseNum(CFG.durM) || 0) * 60 + (parseNum(CFG.durS) || 0);
-    return Math.min(s * 1e6, 1e15);
+  function intervalAs() { const v = decTo(CFG.intVal, UNIT[CFG.intUnit] || UNIT.ns); return v && v > 0n ? v : 0n; }
+  function durationAs() {
+    return (decTo(CFG.durH, 3600n * SEC) || 0n) + (decTo(CFG.durM, 60n * SEC) || 0n) + (decTo(CFG.durS, SEC) || 0n);
   }
-  const maxLaps = () => Math.floor(parseNum(CFG.maxLaps) || 0);
+  const maxLaps = () => { const d = String(CFG.maxLaps ?? '').replace(/\D/g, ''); return d ? B(d) : 0n; };
   function saveCfg() { try { localStorage.setItem(CFG_KEY, JSON.stringify(CFG)); } catch (e) {} }
   function loadCfg() {
-    try { const o = JSON.parse(localStorage.getItem(CFG_KEY) || 'null'); if (o && typeof o === 'object') CFG = { ...DEFAULTS, ...o }; } catch (e) {}
+    try {
+      let o = JSON.parse(localStorage.getItem(CFG_KEY) || 'null');
+      if (!o) { // Migration von v3: alles übernehmen außer dem (zu langsamen) Intervall
+        o = JSON.parse(localStorage.getItem(OLD_CFG_KEY) || 'null');
+        if (o) { delete o.intVal; delete o.intUnit; }
+      }
+      if (o && typeof o === 'object') {
+        CFG = { ...DEFAULTS, ...o };
+        ['maxLaps', 'durH', 'durM', 'durS'].forEach(k => { CFG[k] = String(CFG[k]); });
+      }
+    } catch (e) {}
   }
 
   /* ================= Zustand =================
-   * Alle Zeiten in Mikrosekunden. Runden werden nicht einzeln gespeichert, sondern als
-   * Abschnitte {i0, t0, dt, n, prev, man}: Runde k endet bei t0 + (k+1)*dt, die erste
-   * ist (Ende - prev) lang. Milliarden Auto-Runden kosten so nur wenige Bytes.
+   * Runden werden nicht einzeln gespeichert, sondern als Abschnitte {i0, t0, dt, n, prev, man}:
+   * Runde k endet bei t0 + (k+1)*dt, die erste ist (Ende - prev) lang.
    */
   const S = {
-    running: false, startPerf: 0, elapsed: 0, finished: false,
-    runs: [], closed: 0, closedTotal: 0, auto: null, autoOn: false,
+    running: false, startPerf: 0, elapsed: 0n, finished: false,
+    runs: [], closed: 0n, closedTotal: 0n, auto: null, autoOn: false,
     viewTop: null, prec: 3, pre: null, lastManual: 0,
   };
 
   /* ================= Format ================= */
   const p2 = n => String(n).padStart(2, '0');
-  function fmt(us, dec, floor) {
-    const unit = 10 ** (6 - dec);
-    let v = floor ? Math.floor(us / unit + 1e-7) : Math.round(us / unit);
-    if (!isFinite(v) || v < 0) v = 0;
-    const scale = 10 ** dec, frac = v % scale;
-    let s = Math.floor(v / scale);
-    const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; s %= 60;
-    return (h ? h + ':' + p2(m) : p2(m)) + ':' + p2(s) + '.' + String(frac).padStart(dec, '0');
+  function fmt(as, dec, floor) {
+    const unit = 10n ** B(18 - dec);
+    let v = floor ? as / unit : (as + unit / 2n) / unit;
+    if (v < 0n) v = 0n;
+    const sc = 10n ** B(dec), frac = v % sc;
+    let s = v / sc;
+    const h = s / 3600n, m = (s / 60n) % 60n; s %= 60n;
+    return (h ? h + ':' + p2(m) : p2(m)) + ':' + p2(s) + '.' + frac.toString().padStart(dec, '0');
   }
+  const precFor = dt => dt >= MS ? 3 : dt >= UNIT.us ? 6 : dt >= UNIT.ns ? 9 : dt >= UNIT.ps ? 12 : dt >= UNIT.fs ? 15 : 18;
   const dec = () => CFG.decimals === 'auto' ? S.prec : +CFG.decimals;
-  const precFor = dt => dt < 1 ? 9 : dt < 1000 ? 6 : 3;
-  const nf = new Intl.NumberFormat('de-DE'), nf6 = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 6 });
+  const nf = new Intl.NumberFormat('de-DE');
   const fmtN = n => nf.format(n);
-  function fmtInterval(us) {
-    if (!us) return 'Intervall ungültig';
-    if (us < 1) return nf6.format(Math.round(us * 1e3 * 1e3) / 1e3) + ' ns';
-    if (us < 1e3) return nf6.format(us) + ' µs';
-    if (us < 1e6) return nf6.format(us / 1e3) + ' ms';
-    if (us < 6e7) return nf6.format(us / 1e6) + ' s';
-    return nf6.format(us / 6e7) + ' min';
+  function fmtInterval(as) {
+    if (!as) return 'Intervall ungültig';
+    for (const [k, lbl] of UNIT_LABEL) {
+      const u = UNIT[k];
+      if (as >= u || k === 'as') {
+        const whole = as / u, rem = as % u;
+        let fr = rem ? (rem * 1000000n / u).toString().padStart(6, '0').replace(/0+$/, '') : '';
+        return fmtN(whole) + (fr ? ',' + fr : '') + ' ' + lbl;
+      }
+    }
   }
+  const rateOf = dt => SEC / dt;
 
   /* ================= Feedback ================= */
   let audio;
@@ -88,7 +115,7 @@
   const vibrate = p => { try { if (CFG.vibrate && navigator.vibrate) navigator.vibrate(p); } catch (e) {} };
   function flash() { const d = $('display'); d.classList.remove('flash'); void d.offsetWidth; d.classList.add('flash'); }
   let toastT;
-  function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2400); }
+  function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); }
   let wakeLock = null;
   async function wake(on) {
     try {
@@ -100,8 +127,8 @@
   }
 
   /* ================= Kern ================= */
-  const rawNow = () => S.running ? S.elapsed + (performance.now() - S.startPerf) * 1000 : S.elapsed;
-  const openCount = t => S.auto ? Math.max(0, Math.floor((t - S.auto.t0) / S.auto.dt + 1e-9)) : 0;
+  const rawNow = () => S.running ? S.elapsed + perfToAs(performance.now() - S.startPerf) : S.elapsed;
+  const openCount = t => (S.auto && t >= S.auto.t0) ? (t - S.auto.t0) / S.auto.dt : 0n;
   const lapCount = t => S.closed + openCount(t);
   const lastTotal = t => { const n = openCount(t); return n ? S.auto.t0 + n * S.auto.dt : S.closedTotal; };
 
@@ -113,31 +140,34 @@
       while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (S.runs[mid].i0 <= i) lo = mid; else hi = mid - 1; }
       r = S.runs[lo]; k = i - r.i0;
     }
-    const total = r.t0 + (k + 1) * r.dt;
-    return { total, lap: k === 0 ? total - r.prev : r.dt, man: !!r.man };
+    const total = r.t0 + (k + 1n) * r.dt;
+    return { total, lap: k === 0n ? total - r.prev : r.dt, man: !!r.man };
   }
 
-  // Zeitpunkt, an dem die Uhr endet (Dauer oder Rundenlimit)
+  // Ende durch Dauer oder Rundenlimit (null = kein Ende)
   function endTime(raw) {
-    let e = Infinity;
-    const d = durationUs(); if (d > 0) e = d;
+    let e = null;
+    const d = durationAs(); if (d > 0n) e = d;
     const ml = maxLaps();
-    if (ml > 0 && lapCount(Math.min(raw, e)) >= ml) e = Math.min(e, getLap(ml - 1).total);
+    if (ml > 0n) {
+      const tt = e === null ? raw : bmin(raw, e);
+      if (lapCount(tt) >= ml) { const lt = getLap(ml - 1n).total; e = e === null ? lt : bmin(e, lt); }
+    }
     return e;
   }
-  const now = () => { const r = rawNow(); return Math.min(r, endTime(r)); };
+  const now = () => { const r = rawNow(), e = endTime(r); return e !== null && r > e ? e : r; };
 
   function closeAuto(t) {
     if (!S.auto) return;
     const n = openCount(t);
-    if (n > 0) {
+    if (n > 0n) {
       S.runs.push({ i0: S.closed, t0: S.auto.t0, dt: S.auto.dt, n, prev: S.auto.prev, man: false });
       S.closed += n; S.closedTotal = S.auto.t0 + n * S.auto.dt;
     }
     S.auto = null;
   }
   function openAuto(anchor) {
-    const dt = intervalUs();
+    const dt = intervalAs();
     if (!S.autoOn || !dt) return;
     S.auto = { t0: anchor, dt, prev: S.closedTotal };
     S.prec = Math.max(S.prec, precFor(dt));
@@ -146,28 +176,26 @@
   function start() {
     if (S.pre) { cancelPre(); return; }
     if (S.finished) reset();
-    if (rawNow() >= endTime(rawNow())) return;
+    const r = rawNow(), e = endTime(r);
+    if (e !== null && r >= e) return;
     const delay = +CFG.delay || 0;
-    if (delay > 0 && S.elapsed === 0 && !S.closed) { startPre(delay); return; }
+    if (delay > 0 && S.elapsed === 0n && S.closed === 0n) { startPre(delay); return; }
     reallyStart();
   }
   function reallyStart() {
-    if (CFG.autoOnStart && !S.autoOn && S.elapsed === 0) setAuto(true, true);
+    if (CFG.autoOnStart && !S.autoOn && S.elapsed === 0n) setAuto(true, true);
     S.running = true; S.startPerf = performance.now();
     if (S.autoOn && !S.auto) openAuto(S.elapsed);
     beep(1200, 0.06); wake(true); updateUI(); saveSession(); requestAnimationFrame(tick);
   }
-  function startPre(sec) {
-    S.pre = { until: performance.now() + sec * 1000, last: sec + 1 };
-    updateUI(); requestAnimationFrame(preTick);
-  }
+  function startPre(sec) { S.pre = { until: performance.now() + sec * 1000, last: sec + 1 }; updateUI(); requestAnimationFrame(preTick); }
   function preTick() {
     if (!S.pre) return;
     const left = (S.pre.until - performance.now()) / 1000;
     if (left <= 0) { S.pre = null; reallyStart(); return; }
     const c = Math.ceil(left);
     if (c !== S.pre.last) { S.pre.last = c; beep(660, 0.1); vibrate(40); }
-    $('time').innerHTML = '-' + c + '<small>.' + String(Math.floor((c - left) * 10) % 10) + '</small>';
+    $('time').innerHTML = '-' + c + '<small>.' + (Math.floor((c - left) * 10) % 10) + '</small>';
     $('stateTxt').textContent = 'Start in ' + c + ' s';
     requestAnimationFrame(preTick);
   }
@@ -178,8 +206,8 @@
     S.elapsed = now(); S.running = false; wake(false); updateUI(); render(true); saveSession();
   }
   function reset() {
-    S.pre = null; S.running = false; S.elapsed = 0; S.finished = false; S.runs = []; S.closed = 0; S.closedTotal = 0;
-    S.auto = null; S.viewTop = null; S.prec = 3; lastBeepCount = 0; S.lastManual = 0;
+    S.pre = null; S.running = false; S.elapsed = 0n; S.finished = false; S.runs = []; S.closed = 0n; S.closedTotal = 0n;
+    S.auto = null; S.viewTop = null; S.prec = 3; lastBeepCount = 0n; S.lastManual = 0;
     wake(false); updateUI(); render(true); saveSession();
   }
   function lap() {
@@ -189,9 +217,9 @@
     S.lastManual = pn;
     const t = now();
     closeAuto(t);
-    if (t - S.closedTotal >= 5e-4) {
-      S.runs.push({ i0: S.closed, t0: S.closedTotal, dt: t - S.closedTotal, n: 1, prev: S.closedTotal, man: true });
-      S.closed++; S.closedTotal = t;
+    if (t > S.closedTotal) {
+      S.runs.push({ i0: S.closed, t0: S.closedTotal, dt: t - S.closedTotal, n: 1n, prev: S.closedTotal, man: true });
+      S.closed += 1n; S.closedTotal = t;
     }
     openAuto(t);
     beep(880); vibrate(30); flash(); render(true); saveSession();
@@ -199,7 +227,7 @@
   function setAuto(on, silent) {
     S.autoOn = on;
     const t = now();
-    if (on) { if (!S.auto && (S.running || S.elapsed > 0)) openAuto(t); }
+    if (on) { if (!S.auto && (S.running || S.elapsed > 0n)) openAuto(t); }
     else closeAuto(t);
     updateUI(); if (!silent) { render(true); saveSession(); }
   }
@@ -211,22 +239,20 @@
 
   function stats(t) {
     const n = lapCount(t); if (!n) return null;
-    let best = Infinity, worst = 0, nb = 0, nw = 0;
+    let best = null, worst = null, nb = 0n, nw = 0n;
     const one = (v, c) => {
-      if (v < best) { best = v; nb = c; } else if (v === best) nb += c;
-      if (v > worst) { worst = v; nw = c; } else if (v === worst) nw += c;
+      if (best === null || v < best) { best = v; nb = c; } else if (v === best) nb += c;
+      if (worst === null || v > worst) { worst = v; nw = c; } else if (v === worst) nw += c;
     };
-    const add = (r, cnt) => { one(r.t0 + r.dt - r.prev, 1); if (cnt > 1) one(r.dt, cnt - 1); };
+    const add = (r, cnt) => { one(r.t0 + r.dt - r.prev, 1n); if (cnt > 1n) one(r.dt, cnt - 1n); };
     for (const r of S.runs) add(r, r.n);
     const oc = openCount(t); if (oc) add(S.auto, oc);
-    // Nur eindeutige Bestwerte hervorheben
-    return { n, best, worst, avg: lastTotal(t) / n, markBest: nb === 1, markWorst: nw === 1 };
+    return { n, best, worst, avg: lastTotal(t) / n, markBest: nb === 1n, markWorst: nw === 1n };
   }
 
-  // Wenn Einstellungen das Limit verändern
   function onLimitsChanged() {
-    if (S.finished && endTime(S.elapsed + 1) > S.elapsed) S.finished = false;
-    if (S.running) { const r = rawNow(), e = endTime(r); if (r >= e) finish(e); }
+    if (S.finished) { const e = endTime(S.elapsed + 1n); if (e === null || e > S.elapsed) S.finished = false; }
+    if (S.running) { const r = rawNow(), e = endTime(r); if (e !== null && r >= e) finish(e); }
     updateUI(); render(true);
   }
   function onIntervalChanged() {
@@ -235,11 +261,13 @@
   }
 
   /* ================= Sitzung sichern ================= */
+  const ser = o => JSON.stringify(o, (k, v) => typeof v === 'bigint' ? { $b: v.toString() } : v);
+  const deser = s => JSON.parse(s, (k, v) => v && typeof v === 'object' && typeof v.$b === 'string' ? B(v.$b) : v);
   function saveSession() {
     if (!CFG.restore || S.runs.length > 50000) return;
     try {
-      localStorage.setItem(SESSION_KEY, JSON.stringify({
-        v: 3, wall: Date.now(), running: S.running, elapsed: now(), finished: S.finished,
+      localStorage.setItem(SESSION_KEY, ser({
+        v: 4, wall: Date.now(), running: S.running, elapsed: now(), finished: S.finished,
         runs: S.runs, closed: S.closed, closedTotal: S.closedTotal, auto: S.auto, autoOn: S.autoOn, prec: S.prec,
       }));
     } catch (e) {}
@@ -247,12 +275,12 @@
   function restoreSession() {
     if (!CFG.restore) return;
     try {
-      const o = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
-      if (!o || o.v !== 3) return;
-      Object.assign(S, { runs: o.runs || [], closed: o.closed || 0, closedTotal: o.closedTotal || 0, auto: o.auto || null,
-        autoOn: !!o.autoOn, prec: o.prec || 3, finished: !!o.finished, elapsed: o.elapsed || 0 });
+      const o = deser(localStorage.getItem(SESSION_KEY) || 'null');
+      if (!o || o.v !== 4) return;
+      Object.assign(S, { runs: o.runs || [], closed: o.closed || 0n, closedTotal: o.closedTotal || 0n, auto: o.auto || null,
+        autoOn: !!o.autoOn, prec: o.prec || 3, finished: !!o.finished, elapsed: o.elapsed || 0n });
       if (o.running) {
-        S.elapsed += Math.max(0, Date.now() - o.wall) * 1000;
+        S.elapsed += B(Math.max(0, Date.now() - o.wall)) * MS;
         S.running = true; S.startPerf = performance.now();
         toast('Sitzung wiederhergestellt – die Uhr läuft weiter');
         wake(true);
@@ -263,14 +291,15 @@
   window.addEventListener('pagehide', saveSession);
 
   /* ================= Darstellung ================= */
-  let lastTable = 0, lastBeepCount = 0;
+  let lastTable = 0, lastBeepCount = 0n;
+  const SLOW = 250n * MS;
   function tick() {
     if (!S.running) return;
     try {
       const r = rawNow(), e = endTime(r);
-      if (r >= e) { finish(e); return; }
+      if (e !== null && r >= e) { finish(e); return; }
       const c = lapCount(r);
-      if (S.auto && S.auto.dt >= 250000 && c > lastBeepCount && lastBeepCount) { beep(660); vibrate(20); flash(); }
+      if (S.auto && S.auto.dt >= SLOW && c > lastBeepCount && lastBeepCount) { beep(660); vibrate(20); flash(); }
       lastBeepCount = c;
       render(false);
     } catch (err) { console.error(err); }
@@ -284,20 +313,19 @@
 
   function render(force) {
     if (S.pre) return;
-    const t = now(), n = lapCount(t), d = durationUs(), ml = maxLaps();
+    const t = now(), n = lapCount(t), d = durationAs(), ml = maxLaps();
     const f = fmt(t, 3, true), i = f.lastIndexOf('.');
     $('time').innerHTML = f.slice(0, i) + '<small>' + f.slice(i) + '</small>';
     $('lapCountBig').textContent = fmtN(n);
     $('lapTime').textContent = fmt(t - lastTotal(t), dec(), true);
     $('avgTile').textContent = n ? fmt(lastTotal(t) / n, dec()) : '–';
-    // Fortschritt: Dauer oder Rundenlimit
-    const hasD = d > 0, hasL = ml > 0;
+    const hasD = d > 0n, hasL = ml > 0n;
     $('progBox').hidden = !(hasD || hasL);
     if (hasD || hasL) {
-      let frac = 0, lbl = [];
-      if (hasD) { frac = t / d; lbl.push('Ziel ' + fmt(d, 3)); $('remain').textContent = fmt(d - t, 3); }
-      else $('remain').textContent = fmtN(Math.max(0, ml - n)) + ' Rd.';
-      if (hasL) { frac = Math.max(frac, n / ml); lbl.push('Limit ' + fmtN(ml) + ' Rd.'); }
+      let frac = 0; const lbl = [];
+      if (hasD) { frac = Number(t * 10000n / d) / 10000; lbl.push('Ziel ' + fmt(d, 3)); $('remain').textContent = fmt(d - t, 3); }
+      else $('remain').textContent = fmtN(bmax(0n, ml - n)) + ' Rd.';
+      if (hasL) { frac = Math.max(frac, Number(bmin(n, ml) * 10000n / ml) / 10000); lbl.push('Limit ' + fmtN(ml) + ' Rd.'); }
       $('progress').style.width = Math.min(100, frac * 100) + '%';
       $('limitLbl').textContent = lbl.join(' · ');
     }
@@ -306,24 +334,24 @@
     if (adminOpen && (force || ms - lastInfo > 400)) { lastInfo = ms; renderInfo(t, n); }
   }
 
-  function rows() { return +CFG.rows || 20; }
+  const rows = () => +CFG.rows || 20;
   function renderTable(t, n) {
-    const R = rows();
-    $('empty').hidden = n > 0;
-    let top = S.viewTop == null ? n - 1 : Math.min(S.viewTop, n - 1);
-    top = Math.max(top, Math.min(R - 1, n - 1));
+    const R = B(rows());
+    $('empty').hidden = n > 0n;
+    let top = S.viewTop == null ? n - 1n : bmin(S.viewTop, n - 1n);
+    top = bmax(top, bmin(R - 1n, n - 1n));
     if (S.viewTop != null) S.viewTop = top;
     $('btnLive').classList.toggle('live', S.viewTop == null);
     const st = stats(t), D = dec(), diff = st && fmt(st.best, D) !== fmt(st.worst, D);
     const mb = diff && st.markBest, mw = diff && st.markWorst;
     let html = '';
-    for (let i = top; i > top - R && i >= 0; i--) {
+    for (let i = top; i > top - R && i >= 0n; i--) {
       const l = getLap(i);
       const cls = (mb && l.lap === st.best ? 'best ' : '') + (mw && l.lap === st.worst ? 'worst ' : '') + (l.man ? 'man' : '');
-      html += `<tr class="${cls}"><td>${fmtN(i + 1)}</td><td>${fmt(l.lap, D)}</td><td>${fmt(l.total, D)}</td></tr>`;
+      html += `<tr class="${cls}"><td>${fmtN(i + 1n)}</td><td>${fmt(l.lap, D)}</td><td>${fmt(l.total, D)}</td></tr>`;
     }
     $('lapBody').innerHTML = html;
-    $('pos').textContent = n ? `${fmtN(Math.max(1, top - R + 2))}–${fmtN(top + 1)} / ${fmtN(n)}` : '';
+    $('pos').textContent = n ? `${fmtN(bmax(1n, top - R + 2n))}–${fmtN(top + 1n)} / ${fmtN(n)}` : '';
     if (st) { $('stBest').textContent = fmt(st.best, D); $('stWorst').textContent = fmt(st.worst, D); $('stAvg').textContent = fmt(st.avg, D); }
     else ['stBest', 'stAvg', 'stWorst'].forEach(k => { $(k).textContent = '–'; });
   }
@@ -332,7 +360,7 @@
     const disp = $('display');
     disp.classList.toggle('running', S.running || !!S.pre);
     disp.classList.toggle('finished', S.finished);
-    $('stateTxt').textContent = S.pre ? 'Gleich geht’s los' : S.running ? 'Läuft' : S.finished ? 'Ziel erreicht' : S.elapsed > 0 ? 'Pausiert' : 'Bereit';
+    $('stateTxt').textContent = S.pre ? 'Gleich geht’s los' : S.running ? 'Läuft' : S.finished ? 'Ziel erreicht' : S.elapsed > 0n ? 'Pausiert' : 'Bereit';
     const b = $('btnStart');
     b.classList.toggle('running', S.running || !!S.pre);
     b.innerHTML = (S.running || S.pre)
@@ -340,34 +368,36 @@
       : '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>';
     b.setAttribute('aria-label', S.running ? 'Stopp' : 'Start');
     $('btnLap').disabled = !S.running;
-    const iv = intervalUs();
+    const iv = intervalAs();
     const a = $('btnAuto');
     a.classList.toggle('on', S.autoOn); a.setAttribute('aria-pressed', S.autoOn);
-    $('autoLbl').textContent = iv ? 'alle ' + fmtInterval(iv) + (iv < 1e6 ? ' · ' + fmtN(Math.round(1e6 / iv)) + ' Runden/s' : '') : 'Intervall im Admin-Panel einstellen';
+    $('autoLbl').textContent = iv ? 'alle ' + fmtInterval(iv) + (iv < SEC ? ' · ' + fmtN(rateOf(iv)) + ' Runden/s' : '') : 'Intervall im Admin-Panel einstellen';
     const chip = $('autoChip');
     chip.classList.toggle('on', S.autoOn);
     chip.textContent = S.autoOn ? 'AUTO ' + fmtInterval(iv) : 'AUTO AUS';
+    $$('#speedChips button').forEach(c => c.classList.toggle('on', CFG.intUnit === c.dataset.u && String(CFG.intVal) === c.dataset.v));
     $('lapsCard').hidden = !CFG.showList;
     document.querySelector('.hint').hidden = !CFG.showHints;
   }
 
   function scrollBy(r) {
     const n = lapCount(now()); if (!n) return;
-    const cur = S.viewTop == null ? n - 1 : S.viewTop, nt = cur - r;
-    S.viewTop = nt >= n - 1 ? null : Math.max(Math.min(rows() - 1, n - 1), nt);
+    const R = B(rows());
+    const cur = S.viewTop == null ? n - 1n : S.viewTop, nt = cur - B(r);
+    S.viewTop = nt >= n - 1n ? null : bmax(bmin(R - 1n, n - 1n), nt);
     render(true);
   }
 
   /* ================= Export (in Etappen, friert nicht ein) ================= */
   let exporting = false;
   async function buildText(max, sep, onProgress) {
-    const t = now(), n = lapCount(t), m = Math.min(n, max), D = dec();
+    const t = now(), n = lapCount(t), m = Number(bmin(n, B(max))), D = dec();
     const parts = ['Runde' + sep + 'Rundenzeit' + sep + 'Gesamt' + sep + 'Manuell\n'];
     const CH = 20000;
     for (let s = 0; s < m; s += CH) {
       const e = Math.min(m, s + CH), chunk = new Array(e - s);
       for (let i = s; i < e; i++) {
-        const l = getLap(i);
+        const l = getLap(B(i));
         chunk[i - s] = (i + 1) + sep + fmt(l.lap, D) + sep + fmt(l.total, D) + sep + (l.man ? 'ja' : '');
       }
       parts.push(chunk.join('\n') + '\n');
@@ -388,7 +418,7 @@
       a.download = 'speed-clock-' + new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-') + '.csv';
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(a.href), 10000);
-      toast(n > m ? `CSV: erste ${fmtN(m)} von ${fmtN(n)} Runden (Limit im Admin-Panel)` : `CSV mit ${fmtN(m)} Runden gespeichert`);
+      toast(n > B(m) ? `CSV: erste ${fmtN(m)} von ${fmtN(n)} Runden (Limit im Admin-Panel)` : `CSV mit ${fmtN(m)} Runden gespeichert`);
     } catch (e) { toast('Export fehlgeschlagen'); }
     finally { btns.forEach((b, i) => { b.textContent = orig[i]; }); exporting = false; }
   }
@@ -399,7 +429,7 @@
     try {
       const { parts, n, m } = await buildText(COPY_MAX, '\t');
       await navigator.clipboard.writeText(parts.join(''));
-      toast(n > m ? `Erste ${fmtN(m)} von ${fmtN(n)} Runden kopiert – für mehr CSV nutzen` : `${fmtN(m)} Runden kopiert`);
+      toast(n > B(m) ? `Erste ${fmtN(m)} von ${fmtN(n)} Runden kopiert – für mehr CSV nutzen` : `${fmtN(m)} Runden kopiert`);
     } catch (e) { toast('Kopieren nicht möglich'); }
     finally { exporting = false; }
   }
@@ -430,9 +460,8 @@
     if (location.hash === '#admin') history.replaceState(null, '', location.pathname + location.search);
   }
   async function checkPin() {
-    if (await hash($('pinIn').value) === CFG.pinHash) {
-      unlocked = true; $('pinModal').hidden = true; openAdmin(openAdmin.pendingTab);
-    } else { $('pinErr').textContent = 'Falscher PIN'; $('pinIn').select(); vibrate(80); }
+    if (await hash($('pinIn').value) === CFG.pinHash) { unlocked = true; $('pinModal').hidden = true; openAdmin(openAdmin.pendingTab); }
+    else { $('pinErr').textContent = 'Falscher PIN'; $('pinIn').select(); vibrate(80); }
   }
   function selectTab(tab) {
     $$('#adminTabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
@@ -445,18 +474,24 @@
     });
     $$('.admin [data-seg]').forEach(seg => $$('button', seg).forEach(b => b.classList.toggle('on', b.dataset.v === String(CFG[seg.dataset.seg]))));
     $$('#swatches button').forEach(b => b.classList.toggle('on', b.dataset.v === CFG.accent));
-    $('cfgIntVal').classList.toggle('bad', !intervalUs());
+    $('cfgIntVal').classList.toggle('bad', !intervalAs());
+    $('cfgMaxLaps').classList.toggle('bad', /[^\d\s.]/.test(CFG.maxLaps));
     $('pinState').textContent = CFG.pinHash ? 'PIN aktiv – das Panel ist geschützt.' : 'Kein PIN gesetzt – das Panel ist frei zugänglich.';
     $('btnPinDel').disabled = !CFG.pinHash;
   }
   function setCfg(k, v) {
     CFG[k] = v; saveCfg();
-    if (k === 'intVal' || k === 'intUnit') { $('cfgIntVal').classList.toggle('bad', !intervalUs()); onIntervalChanged(); }
+    if (k === 'intVal' || k === 'intUnit') { $('cfgIntVal').classList.toggle('bad', !intervalAs()); onIntervalChanged(); }
     else if (['durH', 'durM', 'durS', 'maxLaps'].includes(k)) onLimitsChanged();
     else if (k === 'theme' || k === 'accent') applyLook();
-    else if (k === 'restore') { if (!v) try { localStorage.removeItem(SESSION_KEY); } catch (e) {} else saveSession(); }
+    else if (k === 'restore') { if (!v) { try { localStorage.removeItem(SESSION_KEY); } catch (e) {} } else saveSession(); }
     else if (k === 'wake') wake(v && S.running);
     else { updateUI(); render(true); }
+  }
+  function setInterval2(v, u) {
+    CFG.intVal = v; setCfg('intUnit', u); if (adminOpen) syncForm();
+    if (!S.autoOn) setAuto(true);
+    toast('Auto-Runden: alle ' + fmtInterval(intervalAs()) + ' · ' + fmtN(rateOf(intervalAs())) + ' Runden/s');
   }
   function applyLook() {
     const r = document.documentElement;
@@ -472,14 +507,12 @@
     $('iMem').textContent = performance.memory ? (performance.memory.usedJSHeapSize / 1048576).toFixed(1) + ' MB' : 'n/v';
   }
 
-  // Formular-Bindings
   $$('.admin [data-k]').forEach(el => {
     const ev = el.type === 'checkbox' || el.tagName === 'SELECT' ? 'change' : 'input';
     el.addEventListener(ev, () => {
-      const k = el.dataset.k;
       let v = el.type === 'checkbox' ? el.checked : el.value;
       if (el.type === 'range') v = +v;
-      setCfg(k, v);
+      setCfg(el.dataset.k, v);
     });
   });
   $$('.admin [data-seg]').forEach(seg => seg.addEventListener('click', e => {
@@ -487,17 +520,13 @@
     setCfg(seg.dataset.seg, b.dataset.v); syncForm();
   }));
   $('swatches').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { setCfg('accent', b.dataset.v); syncForm(); } });
-  $('intPresets').addEventListener('click', e => {
-    const b = e.target.closest('button'); if (!b) return;
-    CFG.intVal = b.dataset.v; setCfg('intUnit', b.dataset.u); syncForm();
-    if (!S.autoOn) setAuto(true);
-    toast('Auto-Runden: alle ' + fmtInterval(intervalUs()));
-  });
-  $('maxPresets').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { setCfg('maxLaps', +b.dataset.v); syncForm(); } });
+  $('intPresets').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setInterval2(b.dataset.v, b.dataset.u); });
+  $('speedChips').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setInterval2(b.dataset.v, b.dataset.u); });
+  $('maxPresets').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { setCfg('maxLaps', b.dataset.v); syncForm(); } });
   $('durPresets').addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
     const s = +b.dataset.s;
-    CFG.durH = Math.floor(s / 3600); CFG.durM = Math.floor(s / 60) % 60; setCfg('durS', String(s % 60)); syncForm();
+    CFG.durH = String(Math.floor(s / 3600)); CFG.durM = String(Math.floor(s / 60) % 60); setCfg('durS', String(s % 60)); syncForm();
   });
   $('adminTabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) selectTab(b.dataset.tab); });
   $('btnTestBeep').onclick = () => beep(880, 0.12, 2, true);
@@ -520,7 +549,8 @@
       const o = JSON.parse(await e.target.files[0].text());
       for (const k of Object.keys(DEFAULTS)) {
         if (k === 'pinHash' || !(k in o)) continue;
-        if (typeof o[k] === typeof DEFAULTS[k] || ['durH', 'durM', 'maxLaps'].includes(k)) CFG[k] = o[k];
+        if (typeof DEFAULTS[k] === 'string') CFG[k] = String(o[k]);
+        else if (typeof o[k] === typeof DEFAULTS[k]) CFG[k] = o[k];
       }
       saveCfg(); applyLook(); syncForm(); onIntervalChanged(); onLimitsChanged(); toast('Einstellungen importiert');
     } catch (err) { toast('Datei ungültig'); }
@@ -541,8 +571,7 @@
   $('btnLap').onclick = lap;
   $('btnReset').onclick = reset;
   $('btnAuto').addEventListener('click', e => {
-    if (e.target.closest('#autoEdit')) { openAdmin('laps'); return; }
-    if (!intervalUs()) { openAdmin('laps'); return; }
+    if (e.target.closest('#autoEdit') || !intervalAs()) { openAdmin('laps'); return; }
     setAuto(!S.autoOn);
   });
   $('btnAdmin').onclick = () => openAdmin();
@@ -561,15 +590,18 @@
   let touchY = null;
   $('tablewrap').addEventListener('touchstart', e => { touchY = e.touches[0].clientY; }, { passive: true });
   $('tablewrap').addEventListener('touchmove', e => {
-    if (touchY == null || lapCount(now()) <= rows()) return;
+    if (touchY == null || lapCount(now()) <= B(rows())) return;
     e.preventDefault();
     const r = Math.trunc((touchY - e.touches[0].clientY) / 34);
     if (r) { scrollBy(r); touchY -= r * 34; }
   }, { passive: false });
   $('gotoLap').addEventListener('keydown', e => {
     if (e.key !== 'Enter') return;
-    const v = parseInt(e.target.value.replace(/\D/g, ''), 10), n = lapCount(now());
-    if (v >= 1 && n) { const top = Math.min(v - 1 + Math.floor(rows() / 2), n - 1); S.viewTop = top >= n - 1 ? null : top; render(true); }
+    const d = e.target.value.replace(/\D/g, ''), n = lapCount(now());
+    if (!d || !n) return;
+    const v = B(d); if (v < 1n) return;
+    const top = bmin(v - 1n + B(Math.floor(rows() / 2)), n - 1n);
+    S.viewTop = top >= n - 1n ? null : top; render(true);
   });
 
   document.addEventListener('keydown', e => {
@@ -580,12 +612,12 @@
     if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.code === 'Space' || e.key === 'l' || e.key === 'L') { e.preventDefault(); S.running ? lap() : start(); }
     else if (e.key === 'Enter') { e.preventDefault(); S.running ? stop() : start(); }
-    else if (e.key === 'a' || e.key === 'A') { if (intervalUs()) setAuto(!S.autoOn); }
+    else if (e.key === 'a' || e.key === 'A') { if (intervalAs()) setAuto(!S.autoOn); }
     else if (e.key === 'r' || e.key === 'R') reset();
     else if (e.key === 's' || e.key === 'S') openAdmin();
   });
   window.addEventListener('hashchange', () => { if (location.hash === '#admin' && !adminOpen) openAdmin(); });
-  matchMedia('(prefers-color-scheme: light)').addEventListener?.('change', applyLook);
+  try { matchMedia('(prefers-color-scheme: light)').addEventListener('change', applyLook); } catch (e) {}
 
   /* ================= Start ================= */
   loadCfg(); applyLook(); restoreSession(); updateUI(); render(true);
